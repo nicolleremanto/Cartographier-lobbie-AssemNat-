@@ -248,3 +248,114 @@ def modele_convergence(table: pd.DataFrame) -> dict:
                 len(donnees), resultat.prsquared)
     return {"n": len(donnees), "formule": formule, "resultat": resultat,
             "coefficients": resume(resultat), "pseudo_r2": float(resultat.prsquared)}
+
+
+# --------------------------------------------------------------------------
+# 4. Adoption des amendements, et son test placebo
+# --------------------------------------------------------------------------
+
+FORMULE_ADOPTION = (
+    "adopte ~ proximite_lobby_std + proximite_placebo_std + dans_commission_competente"
+    " + log_cosignataires + article_additionnel + C(bloc) + C(texte_cle)"
+)
+
+
+def preparer_amendements(table: pd.DataFrame) -> pd.DataFrame:
+    """Restreint aux amendements effectivement tranchés et exploitables.
+
+    « Tranché » = adopté ou rejeté. Les amendements retirés, tombés ou non
+    soutenus n'ont pas été jugés sur leur contenu : les compter comme des échecs
+    mélangerait deux phénomènes (le contenu de l'amendement et la tactique de
+    séance).
+    """
+    donnees = table[table["sort_tranche"] & table["texte_exploitable"]].copy()
+    donnees = donnees.dropna(subset=["proximite_lobby", "proximite_placebo", "bloc"])
+    for colonne in ("proximite_lobby", "proximite_placebo"):
+        serie = donnees[colonne].astype(float)
+        donnees[f"{colonne}_std"] = (serie - serie.mean()) / serie.std(ddof=0)
+    for colonne in ("adopte", "dans_commission_competente", "article_additionnel"):
+        donnees[colonne] = donnees[colonne].astype(int)
+    return donnees
+
+
+def modele_adoption(table: pd.DataFrame, *, formule: str = FORMULE_ADOPTION) -> dict:
+    """Un amendement proche des demandes déclarées des lobbies est-il plus adopté ?
+
+    Le coefficient de `proximite_placebo_std` est le témoin : il mesure la
+    similarité avec les demandes d'un **autre** secteur, sur un corpus ramené à
+    la même taille. S'il est aussi grand que celui de la vraie proximité, la
+    mesure ne capte que du style administratif et le résultat est à jeter.
+    """
+    donnees = preparer_amendements(table)
+    donnees = retirer_modalites_separantes(donnees, "adopte", "bloc", min_effectif=15)
+    resultat = _ajuster(formule, donnees, groupes=donnees["acteur_ref"])
+    logger.info("modèle d'adoption : n=%d amendements, %d auteurs, "
+                "taux d'adoption %.1f %%, pseudo-R²=%.3f",
+                len(donnees), donnees["acteur_ref"].nunique(),
+                100 * donnees["adopte"].mean(), resultat.prsquared)
+    return {
+        "n": len(donnees),
+        "n_auteurs": int(donnees["acteur_ref"].nunique()),
+        "taux_adoption": float(donnees["adopte"].mean()),
+        "formule": formule,
+        "resultat": resultat,
+        "coefficients": resume(resultat),
+        "pseudo_r2": float(resultat.prsquared),
+        "donnees": donnees,
+    }
+
+
+def comparaison_placebo(resultat_adoption: dict) -> pd.DataFrame:
+    """Met face à face le coefficient réel et son témoin.
+
+    Présenter les deux côte à côte évite la lecture paresseuse qui ne retient que
+    l'étoile de significativité du coefficient qui arrange.
+    """
+    coefficients = resultat_adoption["coefficients"]
+    lignes = []
+    for nom, etiquette in [("proximite_lobby_std", "proximité aux lobbies du texte"),
+                           ("proximite_placebo_std", "proximité aux lobbies d'un autre texte (témoin)")]:
+        if nom not in coefficients.index:
+            continue
+        ligne = coefficients.loc[nom]
+        lignes.append({
+            "mesure": etiquette,
+            "coefficient": ligne["coefficient"],
+            "odds_ratio": ligne["odds_ratio"],
+            "ic_95": f"[{ligne['or_ic_bas']:.2f} ; {ligne['or_ic_haut']:.2f}]",
+            "p_value": ligne["p_value"],
+            "significatif_5pct": bool(ligne["significatif"]),
+        })
+    return pd.DataFrame(lignes)
+
+
+# --------------------------------------------------------------------------
+# 5. Spécialisation : qui amende les textes de son propre secteur ?
+# --------------------------------------------------------------------------
+
+
+def modele_specialisation(table_finale: pd.DataFrame) -> dict:
+    """Un intérêt déclaré dans le secteur d'un texte prédit-il de l'amender ?
+
+    Question volontairement modeste, et la seule qui n'exige aucune inférence sur
+    le lobbying : les intérêts sont déclarés par le député lui-même, et le dépôt
+    d'amendement est un fait. Si même cette relation-là n'apparaît pas, cela
+    borne ce qu'on peut espérer lire dans des données déclaratives.
+    """
+    donnees = table_finale.dropna(subset=["bloc", "part_rurale"]).copy()
+    donnees["amende"] = donnees["a_depose_amendement"].astype(int)
+    donnees["interet_sectoriel_declare"] = donnees["interet_sectoriel_declare"].astype(int)
+    donnees["dans_commission_competente"] = donnees["dans_commission_competente"].astype(int)
+    serie = donnees["part_rurale"].astype(float)
+    donnees["part_rurale_std"] = (serie - serie.mean()) / serie.std(ddof=0)
+    donnees = retirer_modalites_separantes(donnees, "amende", "bloc", min_effectif=15)
+
+    formule = ("amende ~ interet_sectoriel_declare + dans_commission_competente"
+               " + part_rurale_std + C(bloc) + C(texte_cle)")
+    resultat = _ajuster(formule, donnees, groupes=donnees["acteur_ref"])
+    logger.info("modèle de spécialisation : n=%d députés-textes, "
+                "%.0f %% ont déposé au moins un amendement, pseudo-R²=%.3f",
+                len(donnees), 100 * donnees["amende"].mean(), resultat.prsquared)
+    return {"n": len(donnees), "part_amendeurs": float(donnees["amende"].mean()),
+            "formule": formule, "resultat": resultat,
+            "coefficients": resume(resultat), "pseudo_r2": float(resultat.prsquared)}

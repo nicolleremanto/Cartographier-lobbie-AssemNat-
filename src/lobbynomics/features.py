@@ -131,11 +131,16 @@ def proximite_lobbies(amendements_texte: pd.DataFrame, ciblage_texte: pd.DataFra
 
 
 def aretes_biparties(amendements_texte: pd.DataFrame, ciblage_texte: pd.DataFrame,
-                     *, seuil: float = 0.08, max_par_depute: int = 3) -> pd.DataFrame:
+                     *, seuil: float = 0.05, max_par_depute: int = 3) -> pd.DataFrame:
     """Arêtes « lobby ↔ député » du graphe biparti, pondérées par la proximité.
 
-    On ne garde que les quelques meilleures arêtes par député au-dessus d'un
-    seuil : un graphe complet de 600 × 900 nœuds n'apprend rien à personne.
+    On ne garde que les trois meilleures arêtes par député, au-dessus d'un
+    seuil : un graphe complet de plusieurs centaines de nœuds n'apprend rien à
+    personne. Le seuil de 0,05 est un choix de **lisibilité**, pas un test : il a
+    été retenu parce qu'au-dessus (0,08) le graphe de la loi de programmation
+    militaire tombait à une seule arête, et en dessous (0,03) celui de la loi
+    agricole devenait illisible. La figure décrit, elle ne démontre pas — aucune
+    conclusion du rapport n'en dépend.
     """
     deputes = _corpus_amendements(amendements_texte)
     deputes = deputes[deputes["document"].str.len() >= 200]
@@ -175,9 +180,15 @@ def aretes_biparties(amendements_texte: pd.DataFrame, ciblage_texte: pd.DataFram
 # --------------------------------------------------------------------------
 
 
+def secteurs_lexique_du_texte(texte: config.TexteCible) -> list[str]:
+    """Codes secteur du lexique d'intérêts correspondant à un texte."""
+    return [code for code in texte.secteurs_hatvp if code in LEXIQUE_SECTEURS]
+
+
 def table_analyse(*, scrutins: pd.DataFrame, votes: pd.DataFrame,
                   deputes_hatvp: pd.DataFrame, amendements: pd.DataFrame,
                   ciblage: pd.DataFrame, departements: pd.DataFrame,
+                  profil_sectoriel: pd.DataFrame | None = None,
                   textes: tuple[str, ...] | None = None,
                   rang_scrutin: int = 0) -> pd.DataFrame:
     """Assemble la table député × texte.
@@ -227,7 +238,22 @@ def table_analyse(*, scrutins: pd.DataFrame, votes: pd.DataFrame,
         df["a_depose_amendement"] = df["nb_amendements_texte"] > 0
         df["proximite_max"] = df["proximite_max"].fillna(0.0)
         df["proximite_top5"] = df["proximite_top5"].fillna(0.0)
+        # Deux mesures du même concept, gardées toutes les deux et comparées dans
+        # le rapport : la première cherche le vocabulaire du texte dans les
+        # libellés d'intérêts, la seconde passe par un classement sectoriel
+        # explicite. Deux mesures bruitées qui concordent valent mieux qu'une
+        # seule qu'on ne peut pas mettre à l'épreuve.
         df["interet_sectoriel_declare"] = matching.interet_sectoriel(df, texte)
+        if profil_sectoriel is not None:
+            codes = secteurs_lexique_du_texte(texte)
+            presents = [c for c in codes if c in profil_sectoriel.columns]
+            if presents:
+                drapeau = (profil_sectoriel.set_index("acteur_ref")[presents].max(axis=1) > 0)
+                df["interet_secteur_lexique"] = df["acteur_ref"].map(drapeau).fillna(False)
+            else:
+                df["interet_secteur_lexique"] = False
+        else:
+            df["interet_secteur_lexique"] = pd.NA
 
         contexte = df["departement"].map(normaliser).map(densites.to_dict("index"))
         df["densite_hab_km2"] = contexte.map(
@@ -258,7 +284,8 @@ def table_analyse(*, scrutins: pd.DataFrame, votes: pd.DataFrame,
         "position_majoritaire_groupe", "par_delegation",
         "nb_amendements_texte", "nb_amendements_adoptes_texte", "a_depose_amendement",
         "proximite_max", "proximite_top5", "lobby_le_plus_proche",
-        "interet_sectoriel_declare", "nb_interets", "nb_declarations",
+        "interet_sectoriel_declare", "interet_secteur_lexique",
+        "nb_interets", "nb_declarations",
         "densite_hab_km2", "part_rurale",
         "nb_activites_lobby", "nb_organisations_lobby",
     ]
@@ -336,4 +363,312 @@ def table_dissidence(*, scrutins: pd.DataFrame, votes: pd.DataFrame,
                 "(taux de dissidence global %.2f %%)",
                 len(table), table["acteur_ref"].nunique(), table["scrutin_uid"].nunique(),
                 100 * table["dissident"].mean())
+    return table
+
+
+# --------------------------------------------------------------------------
+# Niveau amendement : convergence lexicale et test placebo
+# --------------------------------------------------------------------------
+
+
+def _espace_tfidf(corpus: list[pd.Series]) -> TfidfVectorizer:
+    """Apprend un espace TF-IDF commun à plusieurs corpus.
+
+    Comparer deux corpus vectorisés séparément n'a pas de sens : les poids IDF
+    diffèrent et les cosinus ne sont plus sur la même échelle. On apprend donc
+    l'espace une fois, sur l'union.
+    """
+    vectoriseur = TfidfVectorizer(stop_words=MOTS_VIDES, ngram_range=(1, 2),
+                                  min_df=2, max_df=0.8, sublinear_tf=True, norm="l2")
+    vectoriseur.fit(pd.concat(corpus, ignore_index=True))
+    return vectoriseur
+
+
+def _objets_lobbies(ciblage: pd.DataFrame, cle: str) -> pd.DataFrame:
+    """Objets déclarés de niveau 1 pour un texte, dédoublonnés."""
+    objets = ciblage.loc[ciblage["texte_cle"].eq(cle) & ciblage["cible_nommee"],
+                         ["activite_id", "denomination", "categorie_famille", "objet"]].copy()
+    objets["document"] = objets["objet"].fillna("").map(normaliser)
+    return objets[objets["document"].str.len() > 20].drop_duplicates("document")
+
+
+def table_amendements(amendements: pd.DataFrame, ciblage: pd.DataFrame,
+                      deputes_hatvp: pd.DataFrame,
+                      textes: tuple[str, ...] | None = None,
+                      *, min_caracteres: int = 150) -> pd.DataFrame:
+    """Une ligne par amendement de député sur les textes étudiés.
+
+    Deux variables de convergence lexicale sont calculées pour chaque amendement :
+
+    ``proximite_lobby``    similarité avec les objets déclarés par les lobbies
+                           ayant **nommé ce texte** ;
+    ``proximite_placebo``  similarité avec les objets déclarés des lobbies d'un
+                           **autre** texte de l'étude.
+
+    La seconde est un test de falsification. Si la convergence mesurée captait
+    seulement « cet amendement est rédigé dans un français administratif dense »,
+    les deux variables auraient le même pouvoir explicatif. Si seule la première
+    compte, la mesure capte bien quelque chose de sectoriel. C'est le garde-fou
+    le moins coûteux contre la découverte d'un effet qui n'existe pas.
+    """
+    cles = config.TEXTES_ANALYSE if textes is None else textes
+    # Permutation circulaire : chaque texte est testé contre le suivant.
+    placebo = {cle: cles[(i + 1) % len(cles)] for i, cle in enumerate(cles)}
+
+    morceaux = []
+    for cle in cles:
+        texte = config.TEXTES_PAR_CLE[cle]
+        df = amendements[amendements["dossier_ref"].eq(texte.dossier_ref)
+                         & amendements["type_auteur"].eq("Député")
+                         & amendements["acteur_ref"].notna()].copy()
+        if df.empty:
+            logger.warning("[%s] aucun amendement de député", cle)
+            continue
+
+        df["document"] = (df["expose"].fillna("") + " " + df["dispositif"].fillna("")).map(normaliser)
+        df["texte_exploitable"] = df["document"].str.len() >= min_caracteres
+
+        objets_reels = _objets_lobbies(ciblage, cle)
+        objets_placebo = _objets_lobbies(ciblage, placebo[cle])
+
+        # Le maximum d'une similarité sur N documents croît mécaniquement avec N :
+        # comparer 14 objets « défense » à 165 objets « fraudes » ferait gagner le
+        # placebo sans aucune raison de fond. On ramène donc les deux corpus à la
+        # même taille (tirage à graine fixe, donc reproductible).
+        taille = min(len(objets_reels), len(objets_placebo))
+        if taille:
+            objets_reels = objets_reels.sample(taille, random_state=config.ALEA)
+            objets_placebo = objets_placebo.sample(taille, random_state=config.ALEA)
+        logger.info("[%s] corpus de comparaison ramenés à %d objets "
+                    "(placebo : %s)", cle, taille, placebo[cle])
+
+        corpus = [df["document"], objets_reels["document"], objets_placebo["document"]]
+        if objets_reels.empty or objets_placebo.empty:
+            logger.warning("[%s] corpus de lobbies vide, proximités laissées à 0", cle)
+            df["proximite_lobby"] = 0.0
+            df["proximite_placebo"] = 0.0
+            df["lobby_le_plus_proche"] = None
+        else:
+            vectoriseur = _espace_tfidf([c for c in corpus if not c.empty])
+            matrice = vectoriseur.transform(df["document"])
+            sim_reel = (matrice @ vectoriseur.transform(objets_reels["document"]).T).toarray()
+            sim_placebo = (matrice @ vectoriseur.transform(objets_placebo["document"]).T).toarray()
+            df["proximite_lobby"] = sim_reel.max(axis=1)
+            df["proximite_placebo"] = sim_placebo.max(axis=1)
+            df["lobby_le_plus_proche"] = objets_reels["denomination"].to_numpy()[
+                sim_reel.argmax(axis=1)]
+        df.loc[~df["texte_exploitable"], ["proximite_lobby", "proximite_placebo"]] = np.nan
+
+        df["texte_cle"] = cle
+        df["texte_placebo"] = placebo[cle]
+        morceaux.append(df)
+
+    table = pd.concat(morceaux, ignore_index=True)
+    table = table.merge(
+        deputes_hatvp[["acteur_ref", "nom_complet", "groupe_abrev", "bloc", "departement",
+                       "commissions", "interets_concat"]],
+        on="acteur_ref", how="left")
+    table["dans_commission_competente"] = [
+        bool(pd.notna(com) and pd.Series([com]).str.contains(
+            _commission_attendue(cle), case=False, regex=True).iloc[0])
+        for com, cle in zip(table["commissions"], table["texte_cle"], strict=True)]
+    table["sort_tranche"] = table["sort"].isin(["Adopté", "Rejeté"])
+    table["log_cosignataires"] = np.log1p(table["nb_cosignataires"].fillna(0))
+
+    colonnes = [
+        "texte_cle", "texte_placebo", "amendement_uid", "numero_long", "dossier_ref",
+        "acteur_ref", "nom_complet", "groupe_abrev", "bloc", "departement",
+        "organe_examen", "article_vise", "article_additionnel", "nb_cosignataires",
+        "log_cosignataires", "date_depot", "sort", "adopte", "sort_tranche",
+        "texte_exploitable", "proximite_lobby", "proximite_placebo",
+        "lobby_le_plus_proche", "dans_commission_competente",
+    ]
+    table = table[[c for c in colonnes if c in table.columns]]
+    logger.info("table des amendements : %d lignes, %d auteurs, %d exploitables, "
+                "taux d'adoption %.1f %% (sur %d amendements tranchés)",
+                len(table), table["acteur_ref"].nunique(), int(table["texte_exploitable"].sum()),
+                100 * table.loc[table["sort_tranche"], "adopte"].mean(),
+                int(table["sort_tranche"].sum()))
+    return table
+
+
+# --------------------------------------------------------------------------
+# Intérêts déclarés des députés : dédoublonnage et classement sectoriel
+# --------------------------------------------------------------------------
+
+#: Vocabulaire de rattachement d'un intérêt déclaré à un secteur HATVP. Ces
+#: lexiques sont volontairement courts et lisibles : ils seront faux parfois, et
+#: un lexique de trois pages le serait tout autant sans qu'on puisse le vérifier.
+LEXIQUE_SECTEURS: dict[str, tuple[str, ...]] = {
+    "AGRI": ("agricole", "agriculture", "exploitation agricole", "gaec", "earl",
+             "viticole", "vignoble", "elevage", "cooperative agricole", "safer",
+             "chambre d agriculture", "fnsea", "agroalimentaire", "cuma"),
+    "SANTE": ("hopital", "clinique", "medecin", "pharmac", "infirmier", "chu",
+              "sante", "medical", "ehpad", "laboratoire"),
+    "FINANCE": ("banque", "assurance", "mutuelle", "credit", "caisse d epargne",
+                "maif", "mgen", "macif", "groupama", "finance", "courtage"),
+    "AMENAGEMENT": ("immobilier", "habitat", "hlm", "logement", "batiment",
+                    "construction", "foncier", "amenagement", "urbanisme", "sci"),
+    "EDUCATION": ("education nationale", "universite", "ecole", "college", "lycee",
+                  "enseignant", "professeur", "formation", "cnrs"),
+    "SECURITE": ("defense", "armee", "gendarmerie", "police", "thales", "dassault",
+                 "naval group", "safran", "militaire"),
+    "ENERGIE": ("energie", "edf", "engie", "petrol", "gaz", "nucleaire",
+                "photovoltai", "eolien", "renouvelable"),
+    "TRANSPORTS": ("sncf", "transport", "ratp", "logistique", "aerien", "portuaire",
+                   "routier", "autoroute"),
+    "NUMERIQUE": ("informatique", "numerique", "logiciel", "telecom", "orange",
+                  "digital", "startup", "donnees"),
+    "MEDIA": ("presse", "journal", "radio", "television", "media", "edition",
+              "communication", "audiovisuel"),
+    "JUSTICE": ("avocat", "notaire", "huissier", "barreau", "juridique", "greffe"),
+    "PUBLIC": ("mairie", "commune", "departement", "region", "prefecture",
+               "collectivite", "epci", "syndicat mixte", "ccas"),
+}
+
+
+def dedoublonner_interets(interets: pd.DataFrame) -> pd.DataFrame:
+    """Supprime les répétitions dues aux déclarations modificatives.
+
+    Un député qui dépose une déclaration initiale puis une modificative voit ses
+    intérêts inchangés recopiés à l'identique. Les compter deux fois gonflerait
+    mécaniquement les députés les plus actifs administrativement — exactement le
+    contraire de ce qu'on cherche à mesurer.
+    """
+    if interets.empty:
+        return interets
+    avant = len(interets)
+    propre = interets.drop_duplicates(
+        subset=["nom_normalise", "rubrique", "libelle_normalise"]).reset_index(drop=True)
+    logger.info("intérêts déclarés : %d lignes après dédoublonnage (%d doublons retirés, %.0f %%)",
+                len(propre), avant - len(propre), 100 * (avant - len(propre)) / max(avant, 1))
+    return propre
+
+
+def classer_interets(interets: pd.DataFrame,
+                     lexique: dict[str, tuple[str, ...]] | None = None) -> pd.DataFrame:
+    """Associe à chaque intérêt déclaré zéro, un ou plusieurs secteurs.
+
+    Un intérêt peut relever de deux secteurs (« mutuelle santé » est à la fois
+    SANTE et FINANCE) : on garde les deux plutôt que d'arbitrer arbitrairement.
+    """
+    lexique = LEXIQUE_SECTEURS if lexique is None else lexique
+    if interets.empty:
+        return interets.assign(secteurs_interet="", n_secteurs=0)
+
+    def _secteurs(libelle: str) -> str:
+        trouves = [code for code, mots in lexique.items()
+                   if any(mot in libelle for mot in mots)]
+        return " | ".join(sorted(trouves))
+
+    table = interets.copy()
+    table["secteurs_interet"] = table["libelle_normalise"].fillna("").map(_secteurs)
+    table["n_secteurs"] = table["secteurs_interet"].str.count(r"\|").add(1).where(
+        table["secteurs_interet"].ne(""), 0)
+    couverture = table["secteurs_interet"].ne("").mean()
+    logger.info("classement sectoriel des intérêts : %.0f %% des libellés rattachés "
+                "à au moins un secteur", 100 * couverture)
+    return table
+
+
+def profil_sectoriel_deputes(interets_classes: pd.DataFrame,
+                             deputes: pd.DataFrame) -> pd.DataFrame:
+    """Matrice député × secteur : le député déclare-t-il un intérêt dans ce secteur ?
+
+    Les rubriques retenues excluent les mandats électifs, qui ne sont pas un
+    intérêt privé : presque tous les députés ont été élus locaux, la variable
+    serait constante et n'apprendrait rien.
+    """
+    rubriques_privees = {"activProfCinqDerniere", "activConsultant",
+                         "participationDirigeant", "participationFinanciere",
+                         "fonctionBenevole"}
+    retenus = interets_classes[interets_classes["rubrique"].isin(rubriques_privees)
+                               & interets_classes["secteurs_interet"].ne("")]
+    paires = (retenus.assign(secteur=retenus["secteurs_interet"].str.split(" | ", regex=False))
+              .explode("secteur")
+              .loc[:, ["nom_normalise", "secteur"]]
+              .drop_duplicates())
+    matrice = (paires.assign(present=1)
+               .pivot_table(index="nom_normalise", columns="secteur", values="present",
+                            fill_value=0))
+    profil = (deputes[["acteur_ref", "nom_complet", "nom_normalise", "groupe_abrev",
+                       "bloc", "departement", "commissions"]]
+              .merge(matrice, on="nom_normalise", how="left"))
+    colonnes_secteurs = [c for c in matrice.columns]
+    profil[colonnes_secteurs] = profil[colonnes_secteurs].fillna(0).astype(int)
+    profil["n_secteurs_declares"] = profil[colonnes_secteurs].sum(axis=1)
+    logger.info("profil sectoriel : %d députés, %d secteurs, "
+                "%.0f %% déclarent au moins un intérêt privé classé",
+                len(profil), len(colonnes_secteurs),
+                100 * profil["n_secteurs_declares"].gt(0).mean())
+    return profil
+
+
+# --------------------------------------------------------------------------
+# Déports : le seul lien nommé entre un député, un intérêt et un texte
+# --------------------------------------------------------------------------
+
+
+def table_deports(deports: pd.DataFrame, deputes: pd.DataFrame,
+                  scrutins: pd.DataFrame, votes: pd.DataFrame,
+                  *, legislature: str | None = None) -> pd.DataFrame:
+    """Déports de la législature en cours, avec le comportement de vote observé.
+
+    Un déport est une promesse : « je ne prendrai pas part au vote sur ce texte ».
+    Comme les scrutins sont nominatifs, cette promesse est **vérifiable**. La
+    table indique donc, pour chaque déport rattaché à un dossier, combien de fois
+    le député a voté sur ce dossier et combien de fois il s'est effectivement
+    abstenu ou n'a pas pris part au vote.
+
+    L'effectif (neuf déports) interdit toute statistique. C'est une illustration,
+    et un contrôle de cohérence du reste de la chaîne.
+    """
+    legislature = config.LEGISLATURE if legislature is None else legislature
+    table = deports[deports["legislature"].eq(legislature)].copy()
+    if table.empty:
+        return table
+
+    identites = deputes.set_index("acteur_ref")[["nom_complet", "groupe_abrev", "bloc"]]
+    table = table.join(identites, on="acteur_ref")
+
+    # Un déport qui ne vise que certains articles ne peut pas être vérifié au
+    # niveau du dossier : le député a le droit de voter sur tout le reste du
+    # texte. On ne conclut donc que sur les déports portant sur un texte entier.
+    table["portee_texte_entier"] = ~table["type_cible"].fillna("").str.contains(
+        "article", case=False)
+
+    positions = []
+    for _, ligne in table.iterrows():
+        if pd.isna(ligne.get("dossier_ref")):
+            positions.append({"n_scrutins_dossier": 0, "n_votes_exprimes": 0,
+                              "n_abstentions_ou_absences": 0})
+            continue
+        # Seuls les scrutins **postérieurs** à la publication du déport sont
+        # comparables : un déport ne vaut pas rétroactivement.
+        du_dossier = scrutins[scrutins["dossier_ref"].eq(ligne["dossier_ref"])]
+        if pd.notna(ligne.get("date_publication")):
+            du_dossier = du_dossier[du_dossier["date_scrutin"] >= ligne["date_publication"]]
+        du_dossier = du_dossier["scrutin_uid"]
+        siens = votes[votes["scrutin_uid"].isin(set(du_dossier))
+                      & votes["acteur_ref"].eq(ligne["acteur_ref"])]
+        positions.append({
+            "n_scrutins_dossier": int(len(du_dossier)),
+            "n_votes_exprimes": int(siens["position"].isin(["pour", "contre"]).sum()),
+            "n_abstentions_ou_absences": int(
+                siens["position"].isin(["abstention", "non votant"]).sum()),
+        })
+    table = pd.concat([table.reset_index(drop=True),
+                       pd.DataFrame(positions)], axis=1)
+    table["part_sans_vote_exprime"] = (
+        1 - table["n_votes_exprimes"] / table["n_scrutins_dossier"].replace(0, pd.NA))
+    table["verifiable"] = (table["dossier_ref"].notna() & table["portee_texte_entier"]
+                           & table["n_scrutins_dossier"].gt(0))
+    table["deport_respecte"] = pd.NA
+    table.loc[table["verifiable"], "deport_respecte"] = (
+        table.loc[table["verifiable"], "n_votes_exprimes"] == 0)
+    logger.info("déports de la législature %s : %d, dont %d rattachés à un dossier, "
+                "%d vérifiables (portée = texte entier), %d respectés",
+                legislature, len(table), int(table["dossier_ref"].notna().sum()),
+                int(table["verifiable"].sum()),
+                int(table.loc[table["verifiable"], "deport_respecte"].sum()))
     return table
