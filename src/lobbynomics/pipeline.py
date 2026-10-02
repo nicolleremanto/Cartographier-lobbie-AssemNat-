@@ -5,9 +5,15 @@ commande et pas un rituel. Chaque étape écrit son résultat dans
 `data/processed/`, et l'étape suivante le relit : le pipeline est donc
 reprenable, et le notebook de rapport ne fait que lire ces tables.
 
-    python -m lobbynomics.pipeline              # tout
-    python -m lobbynomics.pipeline --etapes matching features modeles
-    python -m lobbynomics.pipeline --force      # retélécharge les sources
+    python -m lobbynomics.pipeline                       # tout
+    python -m lobbynomics.pipeline --etapes modeles figures
+    python -m lobbynomics.pipeline --force               # retélécharge les sources
+    python -m lobbynomics.pipeline --strict              # échoue si un contrôle qualité échoue
+
+Les étapes, dans l'ordre : ``collecte`` (téléchargement), ``parsing`` (mise à plat),
+``matching`` (rapprochement des bases), ``features`` (variables d'analyse),
+``qualite`` (contrôles sur les tables), ``modeles`` (régressions),
+``robustesse`` (sensibilité aux choix arbitraires) et ``figures``.
 """
 from __future__ import annotations
 
@@ -19,11 +25,13 @@ from typing import Any
 
 import pandas as pd
 
-from . import collect, config, features, matching, models, parse_an, parse_hatvp, viz
+from . import (collect, config, features, matching, models, parse_an, parse_hatvp,
+               quality, robustesse, viz)
 
 logger = logging.getLogger(__name__)
 
-ETAPES = ("collecte", "parsing", "matching", "features", "modeles", "figures")
+ETAPES = ("collecte", "parsing", "matching", "features", "qualite", "modeles",
+          "robustesse", "figures")
 
 
 def lire(nom: str) -> pd.DataFrame:
@@ -78,17 +86,33 @@ def etape_matching() -> None:
         lire("an_deputes"), lire("hatvp_index_declarations"), lire("hatvp_interets_deputes"))
     ecrire(deputes, "deputes_hatvp")
 
+    ecrire(matching.rattacher_deports(lire("an_deports"), lire("an_dossiers")),
+           "deports_rattaches")
+
 
 def etape_features() -> None:
     scrutins = lire("scrutins_rattaches")
     amendements = lire("an_amendements").merge(
         lire("an_textes_dossiers"), on="texte_ref", how="left")
-    ciblage = lire("ciblage_hatvp")
+    ciblage, deputes = lire("ciblage_hatvp"), lire("deputes_hatvp")
+
+    # Intérêts déclarés : dédoublonnage puis classement sectoriel.
+    interets = features.classer_interets(
+        features.dedoublonner_interets(lire("hatvp_interets_deputes")))
+    ecrire(interets, "interets_classes")
+    profil = features.profil_sectoriel_deputes(interets, deputes)
+    ecrire(profil, "profil_sectoriel_deputes")
 
     table_finale = features.table_analyse(
-        scrutins=scrutins, votes=lire("an_votes"), deputes_hatvp=lire("deputes_hatvp"),
-        amendements=amendements, ciblage=ciblage, departements=lire("geo_departements"))
+        scrutins=scrutins, votes=lire("an_votes"), deputes_hatvp=deputes,
+        amendements=amendements, ciblage=ciblage, departements=lire("geo_departements"),
+        profil_sectoriel=profil)
     ecrire(table_finale, "analyse_votes_finaux")
+
+    ecrire(features.table_amendements(amendements, ciblage, deputes), "analyse_amendements")
+
+    ecrire(features.table_deports(lire("deports_rattaches"), lire("an_deputes"),
+                                  scrutins, lire("an_votes")), "analyse_deports")
 
     ecrire(features.table_dissidence(scrutins=scrutins, votes=lire("an_votes"),
                                      table_finale=table_finale),
@@ -99,7 +123,8 @@ def etape_features() -> None:
         ecrire(features.table_analyse(
             scrutins=scrutins, votes=lire("an_votes"),
             deputes_hatvp=lire("deputes_hatvp"), amendements=amendements,
-            ciblage=ciblage, departements=lire("geo_departements"), rang_scrutin=1),
+            ciblage=ciblage, departements=lire("geo_departements"),
+            profil_sectoriel=profil, rang_scrutin=1),
             "analyse_votes_finaux_lecture2")
     except (IndexError, KeyError, ValueError) as err:
         logger.warning("table de robustesse (2e lecture) non produite : %s", err)
@@ -141,9 +166,60 @@ def etape_modeles() -> dict[str, Any]:
     conv["coefficients"].to_csv(config.PROCESSED / "coefficients_convergence.csv")
     resultats["convergence"] = {"n": conv["n"], "pseudo_r2": conv["pseudo_r2"]}
 
+    adoption = models.modele_adoption(lire("analyse_amendements"))
+    adoption["coefficients"].to_csv(config.PROCESSED / "coefficients_adoption.csv")
+    models.comparaison_placebo(adoption).to_csv(
+        config.PROCESSED / "comparaison_placebo.csv", index=False)
+    resultats["adoption"] = {"n": adoption["n"], "n_auteurs": adoption["n_auteurs"],
+                             "taux_adoption": adoption["taux_adoption"],
+                             "pseudo_r2": adoption["pseudo_r2"]}
+
+    specialisation = models.modele_specialisation(table_finale)
+    specialisation["coefficients"].to_csv(config.PROCESSED / "coefficients_specialisation.csv")
+    resultats["specialisation"] = {"n": specialisation["n"],
+                                   "part_amendeurs": specialisation["part_amendeurs"],
+                                   "pseudo_r2": specialisation["pseudo_r2"]}
+
     (config.REPORTS / "resultats_modeles.json").write_text(
         json.dumps(resultats, ensure_ascii=False, indent=2, default=str), "utf-8")
     return resultats
+
+
+def etape_qualite(*, strict: bool = False) -> pd.DataFrame:
+    """Contrôles de qualité sur les tables produites."""
+    rapport = quality.controler_tout(lire)
+    rapport.to_csv(config.PROCESSED / "controles_qualite.csv", index=False)
+    bloquants = quality.echecs(rapport)
+    if not bloquants.empty:
+        logger.error("contrôles en échec :\n%s", bloquants.to_string(index=False))
+        if strict:
+            raise RuntimeError(f"{len(bloquants)} contrôle(s) qualité en échec")
+    return rapport
+
+
+def etape_robustesse() -> dict[str, pd.DataFrame]:
+    """Sensibilité aux choix arbitraires, et vérification du déterminisme."""
+    amendements = lire("an_amendements").merge(
+        lire("an_textes_dossiers"), on="texte_ref", how="left")
+    ciblage, deputes = lire("ciblage_hatvp"), lire("deputes_hatvp")
+    table_finale, dissidence = lire("analyse_votes_finaux"), lire("analyse_dissidence")
+
+    sorties = {
+        "determinisme": robustesse.verifier_determinisme(
+            lire("hatvp_activites"), lire("an_dossiers"), amendements, deputes, ciblage),
+        "sensibilite_proximite": robustesse.sensibilite_mesure_proximite(dissidence),
+        "sensibilite_interet": robustesse.sensibilite_mesure_interet(table_finale),
+        "sensibilite_fenetre": robustesse.sensibilite_fenetre(
+            activites=lire("hatvp_activites"), dossiers=lire("an_dossiers"),
+            scrutins=lire("scrutins_rattaches"), votes=lire("an_votes"),
+            deputes_hatvp=deputes, amendements=amendements,
+            departements=lire("geo_departements"),
+            profil_sectoriel=lire("profil_sectoriel_deputes")),
+    }
+    for nom, table in sorties.items():
+        table.to_csv(config.PROCESSED / f"{nom}.csv", index=False)
+        logger.info("→ %s.csv (%d lignes)", nom, len(table))
+    return sorties
 
 
 def etape_figures() -> list[str]:
@@ -173,6 +249,27 @@ def etape_figures() -> list[str]:
         viz.figure_coefficients(coefficients,
                                 titre="Ce qui prédit un vote dissident sur un amendement"),
         "09_coefficients_dissidence"))
+
+    amendements = lire("analyse_amendements")
+    chemins.append(viz.enregistrer(viz.figure_placebo(amendements), "10_test_placebo"))
+    chemins.append(viz.enregistrer(
+        viz.figure_coefficients(
+            pd.read_csv(config.PROCESSED / "coefficients_adoption.csv", index_col=0),
+            titre="Ce qui prédit l'adoption d'un amendement"),
+        "11_coefficients_adoption"))
+    chemins.append(viz.enregistrer(
+        viz.figure_coefficients(
+            pd.read_csv(config.PROCESSED / "coefficients_specialisation.csv", index_col=0),
+            titre="Ce qui prédit qu'un député amende un texte"),
+        "12_coefficients_specialisation"))
+    chemins.append(viz.enregistrer(
+        viz.figure_secteurs_interets(lire("profil_sectoriel_deputes")), "13_secteurs_interets"))
+
+    fichier_sensibilite = config.PROCESSED / "sensibilite_fenetre.csv"
+    if fichier_sensibilite.exists():
+        chemins.append(viz.enregistrer(
+            viz.figure_sensibilite_fenetre(pd.read_csv(fichier_sensibilite)),
+            "14_sensibilite_fenetre"))
     return chemins
 
 
@@ -181,7 +278,8 @@ def etape_figures() -> list[str]:
 # --------------------------------------------------------------------------
 
 
-def executer(etapes: tuple[str, ...] = ETAPES, *, force: bool = False) -> None:
+def executer(etapes: tuple[str, ...] = ETAPES, *, force: bool = False,
+             strict: bool = False) -> None:
     for etape in etapes:
         if etape not in ETAPES:
             raise ValueError(f"étape inconnue : {etape} (connues : {ETAPES})")
@@ -195,8 +293,12 @@ def executer(etapes: tuple[str, ...] = ETAPES, *, force: bool = False) -> None:
             etape_matching()
         elif etape == "features":
             etape_features()
+        elif etape == "qualite":
+            etape_qualite(strict=strict)
         elif etape == "modeles":
             etape_modeles()
+        elif etape == "robustesse":
+            etape_robustesse()
         elif etape == "figures":
             etape_figures()
         logger.info("══ %s terminé en %.1f s ══", etape, time.perf_counter() - debut)
@@ -208,12 +310,14 @@ def main() -> None:  # pragma: no cover
                            choices=list(ETAPES), help="étapes à exécuter")
     analyseur.add_argument("--force", action="store_true",
                            help="retélécharge et redécompresse les sources")
+    analyseur.add_argument("--strict", action="store_true",
+                           help="interrompt le pipeline si un contrôle qualité échoue")
     analyseur.add_argument("--silencieux", action="store_true")
     args = analyseur.parse_args()
     logging.basicConfig(level=logging.WARNING if args.silencieux else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s — %(message)s",
                         datefmt="%H:%M:%S")
-    executer(tuple(args.etapes), force=args.force)
+    executer(tuple(args.etapes), force=args.force, strict=args.strict)
 
 
 if __name__ == "__main__":  # pragma: no cover

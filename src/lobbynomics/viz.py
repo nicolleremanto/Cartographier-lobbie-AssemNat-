@@ -42,6 +42,11 @@ ETIQUETTES_VARIABLES = {
     "dans_commission_competente": "membre de la commission saisie au fond",
     "a_depose_amendement": "a déposé un amendement sur le texte",
     "log_amendements": "nombre d'amendements déposés (log)",
+    "proximite_lobby_std": "proximité aux lobbies du texte (+1 écart-type)",
+    "proximite_placebo_std": "proximité aux lobbies d'un autre texte — témoin",
+    "log_cosignataires": "nombre de cosignataires (log)",
+    "article_additionnel": "article additionnel",
+    "interet_secteur_lexique": "intérêt déclaré dans le secteur (classement sectoriel)",
     "bloc": "bloc", "texte_cle": "texte",
 }
 
@@ -77,6 +82,11 @@ def enregistrer(figure: plt.Figure, nom: str) -> str:
 
 def _ordonner(series_index: pd.Index) -> list[str]:
     return [b for b in ORDRE_BLOCS if b in set(series_index)]
+
+
+def _etiquettes_blocs(blocs) -> list[str]:
+    """Noms de blocs repliés sur deux lignes : « droite radicale » déborde sinon."""
+    return [textwrap.fill(str(b), 9) for b in blocs]
 
 
 def _habiller(ax, titre: str, sous_titre: str = "", source: str = ""):
@@ -227,7 +237,7 @@ def figure_votes_par_bloc(table: pd.DataFrame) -> plt.Figure:
     for k, colonne in enumerate(croise.columns):
         ax.bar(x + k * largeur - 0.4 + largeur / 2, croise[colonne], width=largeur,
                label=colonne, color=COULEURS_TEXTES.get(colonne, "#777777"))
-    ax.set_xticks(x, croise.index, rotation=15, ha="right")
+    ax.set_xticks(x, _etiquettes_blocs(croise.index), fontsize=8.5)
     ax.set_ylabel("% de votes « pour »")
     ax.set_ylim(0, 105)
     ax.legend(title="texte")
@@ -249,7 +259,7 @@ def figure_dissidence(table_dissidence: pd.DataFrame) -> plt.Figure:
     for k, colonne in enumerate(croise.columns):
         ax.bar(x + k * largeur - 0.4 + largeur / 2, croise[colonne], width=largeur,
                label=colonne, color=COULEURS_TEXTES.get(colonne, "#777777"))
-    ax.set_xticks(x, croise.index, rotation=15, ha="right")
+    ax.set_xticks(x, _etiquettes_blocs(croise.index), fontsize=8.5)
     ax.set_ylabel("% de votes s'écartant de la majorité du groupe")
     ax.legend(title="texte")
     _habiller(ax, "C'est dans les votes d'amendements que la discipline se fissure",
@@ -279,7 +289,7 @@ def figure_proximite(table: pd.DataFrame) -> plt.Figure:
     for cle in ("cmedians", "cbars", "cmins", "cmaxes"):
         if cle in parties:
             parties[cle].set_color("#333333")
-    ax.set_xticks(range(1, len(blocs) + 1), blocs, rotation=15, ha="right")
+    ax.set_xticks(range(1, len(blocs) + 1), _etiquettes_blocs(blocs), fontsize=8.5)
     ax.set_ylabel("proximité lexicale maximale (cosinus TF-IDF)")
     for i, echantillon in enumerate(echantillons, start=1):
         ax.annotate(f"n={len(echantillon)}", xy=(i, 1), xycoords=("data", "axes fraction"),
@@ -427,4 +437,120 @@ def figure_coefficients(coefficients: pd.DataFrame, *, titre: str,
     _habiller(ax, titre, "point = odds ratio, barre = intervalle de confiance à 95 % ; "
                          "en bleu, les effets significatifs au seuil de 5 %",
               "Écarts-types groupés par député.")
+    return fig
+
+
+# --------------------------------------------------------------------------
+# 7. Test placebo
+# --------------------------------------------------------------------------
+
+
+def figure_placebo(amendements: pd.DataFrame) -> plt.Figure:
+    """Proximité réelle contre proximité témoin, texte par texte.
+
+    Si la mesure ne captait que « cet amendement est écrit en français
+    administratif dense », les deux distributions se superposeraient. Les corpus
+    comparés ont été ramenés à la même taille, sinon le maximum d'une similarité
+    sur plus de documents gagnerait mécaniquement.
+    """
+    donnees = amendements[amendements["texte_exploitable"]]
+    cles = [c for c in config.TEXTES_ANALYSE if c in set(donnees["texte_cle"])]
+    fig, axes = plt.subplots(1, len(cles), figsize=(4.1 * len(cles), 3.9), sharey=True)
+    axes = np.atleast_1d(axes)
+
+    for ax, cle in zip(axes, cles, strict=True):
+        sous = donnees[donnees["texte_cle"] == cle]
+        bornes = np.linspace(0, max(sous[["proximite_lobby", "proximite_placebo"]].max().max(), 0.01), 28)
+        ax.hist(sous["proximite_placebo"].dropna(), bins=bornes, color="#c9c0a8",
+                label="témoin (autre secteur)", alpha=0.95)
+        ax.hist(sous["proximite_lobby"].dropna(), bins=bornes, histtype="step",
+                color="#1f3b63", lw=2, label="lobbies du texte")
+        ax.axvline(sous["proximite_placebo"].mean(), color="#8a7f62", ls=":", lw=1.4)
+        ax.axvline(sous["proximite_lobby"].mean(), color="#1f3b63", ls="--", lw=1.4)
+        ax.set_title(cle, loc="left", fontsize=10.5)
+        ax.set_xlabel("proximité lexicale")
+        ecart = sous["proximite_lobby"].mean() - sous["proximite_placebo"].mean()
+        ax.annotate(f"écart des moyennes\n+{ecart:.3f}", xy=(0.97, 0.9), xycoords="axes fraction",
+                    ha="right", fontsize=8.5, color="#444444")
+    axes[0].set_ylabel("nombre d'amendements")
+    axes[0].legend(fontsize=8.5, loc="center right")
+    fig.suptitle("La proximité mesurée est bien sectorielle, pas stylistique",
+                 x=0.005, ha="left", fontweight="bold", fontsize=12)
+    fig.text(0.005, -0.02,
+             "Lecture : pour chaque amendement, similarité maximale avec les objets déclarés des "
+             "lobbies ayant nommé le texte (trait bleu)\net avec ceux d'un autre texte de l'étude "
+             "(aplat beige), sur des corpus ramenés à la même taille.",
+             fontsize=7.5, color="#777777", va="top")
+    fig.tight_layout()
+    return fig
+
+
+# --------------------------------------------------------------------------
+# 8. Intérêts déclarés par les députés
+# --------------------------------------------------------------------------
+
+
+def figure_secteurs_interets(profil: pd.DataFrame) -> plt.Figure:
+    """Secteurs dans lesquels les députés déclarent un intérêt privé, par bloc."""
+    secteurs = [c for c in profil.columns if c.isupper() and c != "NI"]
+    totaux = profil[secteurs].sum().sort_values(ascending=True)
+    blocs = _ordonner(profil["bloc"].dropna().unique())
+
+    fig, ax = plt.subplots(figsize=(8, 0.42 * len(totaux) + 2.2))
+    gauche = np.zeros(len(totaux))
+    for bloc in blocs:
+        part = profil.loc[profil["bloc"] == bloc, totaux.index].sum().to_numpy()
+        ax.barh(totaux.index, part, left=gauche, color=COULEURS_BLOCS.get(bloc, "#999999"),
+                label=bloc, height=0.72)
+        gauche += part
+    for i, total in enumerate(totaux):
+        ax.text(total + 2, i, f"{int(total)}", va="center", fontsize=8.5, color="#444444")
+    ax.set_xlabel("nombre de députés déclarant au moins un intérêt privé dans le secteur")
+    ax.grid(axis="y", visible=False)
+    ax.legend(fontsize=8, ncol=3, loc="lower right")
+    _habiller(ax, "Les députés déclarent surtout des intérêts dans l'immobilier et le secteur public local",
+              f"{len(profil)} députés ; rubriques privées uniquement "
+              "(emplois des cinq dernières années, participations, direction, bénévolat)",
+              "Source : déclarations d'intérêts et d'activités HATVP, classées par lexique "
+              "sectoriel. 34 % des libellés sont rattachés à un secteur : les autres sont "
+              "trop vagues pour être classés.")
+    return fig
+
+
+# --------------------------------------------------------------------------
+# 9. Robustesse
+# --------------------------------------------------------------------------
+
+
+def figure_sensibilite_fenetre(sensibilite: pd.DataFrame) -> plt.Figure:
+    """Coefficient d'exposition et volume retenu, selon la largeur de fenêtre."""
+    fig, ax = plt.subplots(figsize=(7.5, 4.2))
+    ax.plot(sensibilite["marge_mois"], sensibilite["coef_proximite"],
+            marker="o", color="#1f3b63", label="coefficient de proximité")
+    significatif = sensibilite["p_proximite"] < 0.05
+    ax.scatter(sensibilite.loc[significatif, "marge_mois"],
+               sensibilite.loc[significatif, "coef_proximite"],
+               color="#b03a2e", zorder=4, s=70, label="significatif à 5 %")
+    ax.axhline(0, color="#444444", ls="--", lw=1)
+    ax.set_xlabel("marge appliquée autour de la fenêtre de débat (mois)")
+    ax.set_ylabel("coefficient logit de la proximité")
+    ax.set_ylim(min(0, sensibilite["coef_proximite"].min() * 1.4),
+                max(sensibilite["coef_proximite"].max() * 1.4, 0.02))
+
+    secondaire = ax.twinx()
+    secondaire.bar(sensibilite["marge_mois"], sensibilite["activites_niveau_1"],
+                   width=1.4, color="#d9a13b", alpha=0.3, zorder=0)
+    secondaire.set_ylabel("activités de niveau 1 retenues", color="#8a6d20")
+    secondaire.grid(visible=False)
+    for _, ligne in sensibilite.iterrows():
+        ax.annotate(f"p={ligne['p_proximite']:.2f}",
+                    xy=(ligne["marge_mois"], ligne["coef_proximite"]),
+                    xytext=(0, 9), textcoords="offset points",
+                    ha="center", fontsize=8, color="#555555")
+    ax.legend(loc="lower right", fontsize=8.5)
+    _habiller(ax, "Le résultat ne tient pas à la largeur de fenêtre choisie",
+              "coefficient de la proximité lexicale dans le modèle de dissidence, "
+              "pour cinq largeurs de fenêtre temporelle",
+              "Le volume d'activités retenues varie de 184 à 256 ; le coefficient reste "
+              "entre 0,06 et 0,09 et n'atteint jamais le seuil de 5 %.")
     return fig
