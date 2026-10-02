@@ -1,0 +1,25 @@
+contrôle,portée,constat,statut,commentaire
+unicité de amendement_uid,an_amendements,126 392 lignes  0 doublon(s)  0 valeur(s) manquante(s),ok,
+sort renseigné si et seulement si l'amendement a été discuté,an_amendements,70 185 discutés  70 185 avec sort  0 incohérence(s),ok,"les 44 % sans sort sont des amendements non discutés (irrecevables, retirés, en attente) : c'est une absence attendue, pas une donnée perdue"
+auteur individuel absent si et seulement si l'amendement est gouvernemental,an_amendements,1 442 amendements du Gouvernement  0 incohérence(s)  4 amendement(s) effacé(s) exclu(s),ok,un amendement du Gouvernement n'a pas d'auteur député : c'est normal
+plage de date_depot,an_amendements,"2024-09-18 → 2026-10-02, 0 hors fenêtre [2024-07-01 ; 2029-12-31]",ok,
+complétude de texte_ref,an_amendements,0.0 % manquants,ok,
+complétude de etat,an_amendements,0.0 % manquants,ok,
+unicité de acteur_ref,an_deputes,649 lignes  0 doublon(s)  0 valeur(s) manquante(s),ok,
+complétude de acteur_ref,an_deputes,0.0 % manquants,ok,
+complétude de nom_complet,an_deputes,0.0 % manquants,ok,
+complétude de groupe_abrev,an_deputes,0.0 % manquants,ok,
+complétude de departement,an_deputes,0.0 % manquants,ok,
+unicité de dossier_ref,an_dossiers,2 971 lignes  0 doublon(s)  0 valeur(s) manquante(s),ok,
+unicité de scrutin_uid,an_scrutins,8 455 lignes  0 doublon(s)  0 valeur(s) manquante(s),ok,
+plage de date_scrutin,an_scrutins,"2024-10-08 → 2026-10-02, 0 hors fenêtre [2024-07-01 ; 2029-12-31]",ok,
+cohérence décompte officiel / détail nominatif,an_scrutins × an_votes,0 scrutin(s) en écart sur 7 998 (0.0 %),ok,écart attendu : les mises au point de vote modifient le détail nominatif sans changer le résultat proclamé
+intégrité acteur_ref → acteur_ref,an_votes → an_deputes,0 clé(s) orpheline(s) sur 1 273 091 (0.00 %),ok,
+intégrité scrutin_uid → scrutin_uid,an_votes → an_scrutins,0 clé(s) orpheline(s) sur 1 273 091 (0.00 %),ok,
+variabilité de dissident,analyse_dissidence,4.31 % de positifs,ok,
+activités de niveau 1 — agriculture,ciblage_hatvp,29 activité(s) nommant le texte,ok,
+activités de niveau 1 — defense,ciblage_hatvp,14 activité(s) nommant le texte,ok,
+activités de niveau 1 — fraudes,ciblage_hatvp,165 activité(s) nommant le texte,ok,
+unicité de identifiant_national,hatvp_organisations,4 094 lignes  0 doublon(s)  0 valeur(s) manquante(s),ok,
+dossiers introuvables issus de la législature précédente,scrutins_rattaches,"12 scrutin(s), 4 dossier(s) distinct(s), 12 au préfixe DLR5L16",ok,textes entamés sous la législature précédente : le fichier téléchargé ne couvre que la législature en cours
+couverture du rattachement scrutin → dossier,scrutins_rattaches,"90.7 % rattachés (2629 déclarés, 5041 inférés)",ok,les non rattachés sont des titres qui ne nomment aucun texte

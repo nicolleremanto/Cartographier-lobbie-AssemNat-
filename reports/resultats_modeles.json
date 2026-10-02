@@ -34,5 +34,16 @@
   "convergence": {
     "n": 166,
     "pseudo_r2": 0.013713318765380955
+  },
+  "adoption": {
+    "n": 1145,
+    "n_auteurs": 159,
+    "taux_adoption": 0.23406113537117904,
+    "pseudo_r2": 0.19227124774498439
+  },
+  "specialisation": {
+    "n": 1639,
+    "part_amendeurs": 0.12751677852348994,
+    "pseudo_r2": 0.2627548658971759
   }
 }

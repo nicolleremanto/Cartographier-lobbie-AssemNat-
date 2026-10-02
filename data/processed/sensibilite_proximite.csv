@@ -1,0 +1,3 @@
+mesure,n,coefficient,p_value,odds_ratio,pseudo_r2
+proximite_max,87914,0.0861,0.0811,1.0899,0.07649195753610305
+proximite_top5,87914,0.0668,0.2356,1.0691,0.07631225712580636
