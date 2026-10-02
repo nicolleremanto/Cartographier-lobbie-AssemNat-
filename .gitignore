@@ -1,0 +1,29 @@
+# Données : jamais dans Git.
+# Le dépôt doit rester clonable en quelques secondes ; les ~700 Mo de sources
+# officielles se retéléchargent en une commande (python -m lobbynomics.pipeline
+# --etapes collecte). Seules les petites tables d'analyse sont versionnées,
+# voir l'exception plus bas.
+data/raw/
+data/interim/
+data/processed/*.parquet
+
+# Exceptions : les tables légères qui permettent de relire le rapport sans
+# relancer la collecte, et l'audit annoté à la main (qui, lui, n'est pas
+# reproductible par le code).
+!data/processed/analyse_votes_finaux.parquet
+!data/processed/analyse_dissidence.parquet
+!data/processed/audit_rattachement_scrutins.parquet
+!data/processed/ciblage_hatvp.parquet
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Système
+.DS_Store
+.ipynb_checkpoints
