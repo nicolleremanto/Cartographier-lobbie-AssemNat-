@@ -11,9 +11,12 @@ data/processed/*.parquet
 # relancer la collecte, et l'audit annoté à la main (qui, lui, n'est pas
 # reproductible par le code).
 !data/processed/analyse_votes_finaux.parquet
+!data/processed/analyse_votes_finaux_lecture2.parquet
 !data/processed/analyse_dissidence.parquet
 !data/processed/audit_rattachement_scrutins.parquet
 !data/processed/ciblage_hatvp.parquet
+!data/processed/graphe_aretes.parquet
+!data/processed/deputes_hatvp.parquet
 
 # Python
 __pycache__/
