@@ -17,6 +17,12 @@ data/processed/*.parquet
 !data/processed/ciblage_hatvp.parquet
 !data/processed/graphe_aretes.parquet
 !data/processed/deputes_hatvp.parquet
+!data/processed/analyse_amendements.parquet
+!data/processed/analyse_deports.parquet
+!data/processed/profil_sectoriel_deputes.parquet
+
+# Sorties légères des contrôles et de la robustesse (CSV, quelques kilo-octets).
+!data/processed/*.csv
 
 # Python
 __pycache__/
