@@ -1,0 +1,38 @@
+{
+  "vote_final": {
+    "n": 1666,
+    "part_pour": 0.7034813925570228,
+    "part_observations_separees": 0.5510204081632653,
+    "identifiable": false
+  },
+  "regle_bloc": {
+    "agriculture": {
+      "n": 547,
+      "part_pour": 0.6746,
+      "exactitude_regle_bloc": 0.9945,
+      "nb_votes_atypiques": 3
+    },
+    "defense": {
+      "n": 562,
+      "part_pour": 0.7829,
+      "exactitude_regle_bloc": 0.9342,
+      "nb_votes_atypiques": 37
+    },
+    "fraudes": {
+      "n": 557,
+      "part_pour": 0.6517,
+      "exactitude_regle_bloc": 0.9946,
+      "nb_votes_atypiques": 3
+    }
+  },
+  "dissidence": {
+    "n": 87914,
+    "n_deputes": 537,
+    "taux_dissidence": 0.04266669699934027,
+    "pseudo_r2": 0.07649195753610305
+  },
+  "convergence": {
+    "n": 166,
+    "pseudo_r2": 0.013713318765380955
+  }
+}
