@@ -1,0 +1,4 @@
+texte_cle,n,part_pour,exactitude_regle_bloc,nb_votes_atypiques
+agriculture,547,0.6746,0.9945,3
+defense,562,0.7829,0.9342,37
+fraudes,557,0.6517,0.9946,3
