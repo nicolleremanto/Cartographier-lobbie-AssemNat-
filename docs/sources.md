@@ -33,10 +33,16 @@ Toutes sous `https://data.assemblee-nationale.fr/static/openData/repository/17/`
 | `an_scrutins.json.zip` | `loi/scrutins/Scrutins.json.zip` | 26 Mo | 8 455 scrutins, 1 273 091 votes nominatifs |
 | `an_amendements.json.zip` | `loi/amendements_div_legis/Amendements.json.zip` | 304 Mo | 126 392 amendements avec exposé des motifs |
 | `an_dossiers.json.zip` | `loi/dossiers_legislatifs/Dossiers_Legislatifs.json.zip` | 11 Mo | 2 971 dossiers de la XVIIe législature |
-| `an_acteurs.json.zip` | `amo/tous_acteurs_mandats_organes_xi_legislature/AMO30_…json.zip` | 14 Mo | 649 députés, mandats, 10 817 organes |
+| `an_acteurs.json.zip` | `amo/tous_acteurs_mandats_organes_xi_legislature/AMO30_…json.zip` | 14 Mo | 649 députés, mandats, 10 817 organes, et **59 déports** (sous-dossier `deport/`) |
 
 Licence : Licence Ouverte 2.0.
 Page de référence : <https://data.assemblee-nationale.fr/>
+
+**Les déports.** L'archive des acteurs contient un sous-dossier `deport/` rarement
+exploité : 59 déclarations de conflit d'intérêts depuis 2017, où un député indique ne pas
+vouloir prendre part au vote sur un texte donné. C'est la seule source du projet qui nomme
+ensemble une personne, un intérêt privé et un texte. Le volume interdit toute statistique,
+mais permet une vérification ligne à ligne contre les scrutins nominatifs.
 
 **Pièges rencontrés.** Le JSON est une conversion automatique de XML : un champ
 absent peut valoir `null`, `{"@xsi:nil": "true"}` ou `{"#text": "…"}` ; une liste

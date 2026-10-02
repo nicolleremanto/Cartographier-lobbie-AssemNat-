@@ -38,6 +38,50 @@
 * Titre de figure affirmant une différence entre blocs que la figure ne montrait
   pas. Titre corrigé plutôt que figure forcée.
 
+---
+
+## 2 octobre 2026 (suite) — consolidation
+
+**Fait**
+
+* **Volet amendements** : nouvelle unité d'analyse (2 452 amendements de députés sur les
+  trois textes), avec un **test placebo** — proximité aux lobbies d'un *autre* texte, sur
+  un corpus ramené à la même taille. C'est lui qui a révélé ce que la mesure capte
+  vraiment.
+* **Volet intérêts déclarés** : dédoublonnage (51 % de doublons dus aux déclarations
+  modificatives), classement sectoriel par lexique, et le seul résultat bien identifié du
+  projet.
+* **Déports** : 59 déclarations de conflit d'intérêts, le seul endroit où un député, un
+  intérêt et un texte sont nommés ensemble. Rattachés aux dossiers et vérifiés contre les
+  scrutins.
+* **`quality.py`** : 24 contrôles de qualité des données, chacun testé contre une anomalie
+  fabriquée exprès.
+* **`robustesse.py`** : sensibilité à la fenêtre temporelle, à la mesure de proximité et à
+  la mesure d'intérêt ; vérification du déterminisme par empreintes SHA-256.
+* Makefile, intégration continue GitHub Actions, 58 tests.
+
+**Décisions**
+
+| Décision | Raison |
+| --- | --- |
+| Ramener les corpus placebo à la même taille | le maximum d'une similarité sur *N* documents croît avec *N* : sans ça le témoin « gagnait » sur la défense |
+| Ne conserver que les paires éligibles dans `ciblage_hatvp` | le produit cartésien complet faisait 452 000 lignes et 42 Mo, pour aucune information de plus |
+| Seuil de 0,05 pour les arêtes du graphe | choix de lisibilité, assumé comme tel : au-dessus le graphe de la défense tombait à une arête |
+| Annoncer le bas de la fourchette pour l'effet des intérêts déclarés | kappa de 0,45 entre les deux mesures : le sens est robuste, l'ampleur non |
+
+**Erreurs commises, et comment elles ont été vues**
+
+* `partial_token_set_ratio` utilisé une **deuxième** fois, sur les déports : il rattachait
+  les neuf déports de la législature à « Allocution du Président d'âge » avec un score de
+  100. Repéré en lisant le tableau de sortie, pas en lisant le code. Désormais couvert par
+  un test.
+* Le filtre de longueur sur les titres de dossiers (`> 10` caractères) excluait
+  « Fin de vie ». Abaissé à 5 après vérification que cela ne change ni la couverture ni la
+  précision du rattachement des scrutins.
+* Première version des contrôles qualité trop générique : trois « échecs » qui étaient en
+  fait des régularités de la source. Un contrôle qui crie au loup est pire que pas de
+  contrôle.
+
 **À faire ensuite**
 
 - [ ] Faire valider le sujet par la chargée de TD.

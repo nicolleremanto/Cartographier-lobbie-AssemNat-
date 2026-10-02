@@ -18,11 +18,11 @@ complétée par le TP1 et le courriel de la chargée de TD du 22 septembre 2026.
 
 | Poste | Points | Où c'est traité |
 | --- | --- | --- |
-| Données : collecte et nettoyage | 4 | `collect.py`, `parse_an.py`, `parse_hatvp.py` — 7 sources, ~700 Mo, API + téléchargements + XML en flux |
-| Analyse descriptive | 4 | notebook, parties 2 et 3 ; chaque chiffre et chaque figure sont commentés |
-| Démarche scientifique et reproductibilité | 5 | `pipeline.py`, manifeste de provenance, `requirements.txt`, 32 tests, `docs/methode.md` |
-| Format du code | 2 | code en fonctions, modules par étape, aucun copier-coller de cellule |
-| Soutenance | 5 | — |
+| Données : collecte et nettoyage | 4 | `collect.py`, `parse_an.py`, `parse_hatvp.py` — 8 fichiers, 4 producteurs, ~700 Mo, API + téléchargements + XML lu en flux + dédoublonnage (51 % de doublons dans les déclarations) |
+| Analyse descriptive | 4 | notebook, parties 1 à 5 ; chaque chiffre et chaque figure sont commentés, 18 figures |
+| Démarche scientifique et reproductibilité | 5 | `pipeline.py` en une commande, manifeste de provenance SHA-256, `quality.py` (24 contrôles), `robustesse.py` (sensibilité + déterminisme), test placebo, 58 tests, CI GitHub Actions, `docs/methode.md` |
+| Format du code | 2 | 11 modules, un par étape ; le notebook n'appelle que des fonctions |
+| Soutenance | 5 | `docs/rapport-explicatif.pdf`, section « préparer la soutenance » |
 
 ## Points explicitement exigés, et leur traitement ici
 
@@ -45,7 +45,7 @@ complétée par le TP1 et le courriel de la chargée de TD du 22 septembre 2026.
   et surtout un travail de rapprochement sans clé commune, qui est le cœur du
   projet.
 * **Au moins une dimension approfondie** → c'est le **matching**, avec sa
-  validation chiffrée et son audit manuel.
+  validation chiffrée, son audit manuel, son test placebo et ses tests de sensibilité.
 
 ## À faire côté organisation
 
