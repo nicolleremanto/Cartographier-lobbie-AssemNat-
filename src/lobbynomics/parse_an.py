@@ -380,6 +380,7 @@ def construire_tables_an(*, ecrire: bool = True) -> dict[str, pd.DataFrame]:
         "an_organes": organes,
         "an_deputes": charger_deputes(organes),
         "an_dossiers": charger_dossiers(),
+        "an_deports": charger_deports(),
     }
     tables["an_textes_dossiers"] = table_textes_dossiers(tables["an_dossiers"])
     tables["an_scrutins"], tables["an_votes"] = charger_scrutins()
@@ -397,3 +398,48 @@ def construire_tables_an(*, ecrire: bool = True) -> dict[str, pd.DataFrame]:
 if __name__ == "__main__":  # pragma: no cover
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     construire_tables_an()
+
+
+# --------------------------------------------------------------------------
+# Déports — les déclarations de conflit d'intérêts des députés
+# --------------------------------------------------------------------------
+
+
+def charger_deports() -> pd.DataFrame:
+    """Un déport déclaré par ligne.
+
+    Un « déport » est la décision d'un député de ne pas prendre part à un vote
+    en raison d'un intérêt personnel. C'est, dans tout le paysage de données
+    exploré par ce projet, **le seul endroit où un député, un intérêt privé et
+    un texte précis sont nommés ensemble**. Le répertoire HATVP ne nomme jamais
+    le député approché ; les déclarations d'intérêts ne nomment aucun texte. Ici,
+    les trois sont réunis — mais sur 59 cas seulement, toutes législatures
+    confondues.
+
+    Le volume interdit toute statistique ; c'est une source qualitative, et un
+    point de vérification : on peut contrôler dans les scrutins si le déport
+    annoncé a été suivi d'effet.
+    """
+    lignes = []
+    for dep in _charger(config.INTERIM / "an_acteurs" / "json" / "deport", "deport"):
+        cible = dep.get("cible") or {}
+        lignes.append({
+            "deport_uid": _txt(dep.get("uid")),
+            "legislature": _txt(dep.get("legislature")),
+            "acteur_ref": _txt(dep.get("refActeur")),
+            "date_publication": (_txt(dep.get("datePublication")) or "")[:10] or None,
+            "portee": _txt((dep.get("portee") or {}).get("libelle")),
+            "lecture": _txt((dep.get("lecture") or {}).get("libelle")),
+            "instance": _txt((dep.get("instance") or {}).get("libelle")),
+            "type_cible": _txt((cible.get("type") or {}).get("libelle")),
+            "reference_textuelle": _txt(cible.get("referenceTextuelle")),
+            "explication": nettoyer_html(_txt(dep.get("explication"))),
+        })
+    df = pd.DataFrame(lignes)
+    if not df.empty:
+        df["reference_normalisee"] = df["reference_textuelle"].map(normaliser)
+        df = df.sort_values(["legislature", "date_publication"]).reset_index(drop=True)
+    logger.info("déports : %d lignes (%d pour la législature en cours), %d députés",
+                len(df), int(df["legislature"].eq(config.LEGISLATURE).sum()),
+                df["acteur_ref"].nunique())
+    return df

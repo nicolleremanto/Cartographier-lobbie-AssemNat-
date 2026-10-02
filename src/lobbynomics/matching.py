@@ -181,8 +181,9 @@ def rattacher_scrutins(scrutins: pd.DataFrame, dossiers: pd.DataFrame,
     scrutins["n_candidats_ex_aequo"] = ex_aequo
 
     retenu = scrutins["dossier_fuzzy"].where(scrutins["score_fuzzy"] >= seuil)
-    scrutins["dossier_ref"] = (scrutins["dossier_ref_declare"]
-                               .astype("object").fillna(retenu.astype("object")))
+    # `combine_first` plutôt que `fillna` : sur une colonne entièrement vide,
+    # `fillna` tente une conversion de type et déclenche un avertissement pandas.
+    scrutins["dossier_ref"] = scrutins["dossier_ref_declare"].combine_first(retenu)
     scrutins["origine_lien"] = "aucun"
     scrutins.loc[scrutins["dossier_ref_declare"].notna(), "origine_lien"] = "declare"
     scrutins.loc[scrutins["dossier_ref_declare"].isna()
@@ -520,3 +521,105 @@ def interet_sectoriel(fusion: pd.DataFrame, texte: config.TexteCible) -> pd.Seri
     """
     concat = fusion.get("interets_concat", pd.Series("", index=fusion.index)).fillna("")
     return concat.map(lambda s: _compte_mots_cles(s, texte.mots_cles) > 0)
+
+
+# --------------------------------------------------------------------------
+# D. Déports : relier une déclaration de conflit d'intérêts à un texte
+# --------------------------------------------------------------------------
+
+
+#: Abréviations employées dans les références textuelles des déports.
+ABREVIATIONS_TEXTES = {
+    "plfss": "projet de loi de financement de la securite sociale",
+    "plfr": "projet de loi de finances rectificative",
+    "plf": "projet de loi de finances",
+    "lpm": "loi de programmation militaire",
+}
+
+#: Amorces possibles en tête de référence textuelle d'un déport.
+_AMORCES_DEPORT = (
+    "projet de loi constitutionnelle", "proposition de loi constitutionnelle",
+    "projet de loi organique", "proposition de loi organique",
+    "projet de loi", "proposition de loi", "proposition de resolution",
+)
+
+_NUMERO = re.compile(r"\bn\s*\d+\b")
+_PREFIXE_ARTICLE = re.compile(
+    r"^(article|articles|chapitre|titre)s?\b.*?\b(du|de la|de l|des)\b\s*")
+
+
+def denomination_deport(reference: str | None) -> str:
+    """Extrait la dénomination du texte visé par un déport.
+
+    Les références sont saisies à la main par le député et prennent trois formes :
+    l'intitulé complet (« Projet de loi n° 2630 actualisant la programmation
+    militaire… »), un renvoi à un article (« Article 19 de la proposition de loi
+    n°1100 relative à la fin de vie »), ou une formule générique sans texte
+    identifiable (« Articles de loi ayant trait aux assurances »). Seules les deux
+    premières sont exploitables ; la troisième renvoie une chaîne vide, et le
+    déport restera non rattaché. C'est le bon comportement : inventer un
+    rattachement serait pire que l'absence.
+    """
+    base = normaliser(reference)
+    if not base:
+        return ""
+    for abreviation, complet in ABREVIATIONS_TEXTES.items():
+        base = re.sub(rf"\b{abreviation}\b", complet, base)
+    base = _NUMERO.sub(" ", base)
+    base = _PREFIXE_ARTICLE.sub("", base).strip()
+
+    position, amorce_trouvee = -1, ""
+    for amorce in _AMORCES_DEPORT:
+        p = base.find(amorce)
+        if p >= 0 and (position < 0 or p < position
+                       or (p == position and len(amorce) > len(amorce_trouvee))):
+            position, amorce_trouvee = p, amorce
+    if position < 0:
+        return ""
+    return re.sub(r"\s+", " ", base[position + len(amorce_trouvee):]).strip(" .,;")
+
+
+def rattacher_deports(deports: pd.DataFrame, dossiers: pd.DataFrame,
+                      *, seuil: int = 85) -> pd.DataFrame:
+    """Rattache chaque déport au dossier législatif qu'il vise.
+
+    Même méthode que pour les scrutins — extraction de la dénomination puis
+    `token_set_ratio` — et surtout **pas** de similarité partielle : testée ici,
+    elle rattachait les neuf déports de la législature à des intitulés comme
+    « Allocution du Président d'âge », avec un score de 100. Le piège est le même
+    qu'au niveau 1 du ciblage HATVP : un scorer partiel compare une référence à
+    un fragment de la cible, et trouve toujours un fragment qui convient.
+    """
+    if deports.empty:
+        return deports.assign(denomination=None, dossier_ref=None,
+                              score_fuzzy=0.0, titre_dossier=None)
+
+    candidats = dossiers.dropna(subset=["titre"]).copy()
+    candidats["cle"] = candidats["titre"].map(_cle_comparaison)
+    candidats = candidats[candidats["cle"].str.len() > 5].reset_index(drop=True)
+    choix = candidats["cle"].tolist()
+
+    resultat = deports.copy()
+    resultat["denomination"] = resultat["reference_textuelle"].map(denomination_deport)
+
+    refs, scores, titres = [], [], []
+    for denomination in resultat["denomination"]:
+        meilleur = (process.extractOne(denomination, choix, scorer=fuzz.token_set_ratio,
+                                       score_cutoff=seuil)
+                    if len(denomination) > 10 else None)
+        if meilleur is None:
+            refs.append(None); scores.append(0.0); titres.append(None)
+        else:
+            _, score, index = meilleur
+            refs.append(candidats.loc[index, "dossier_ref"])
+            scores.append(float(score))
+            titres.append(candidats.loc[index, "titre"])
+
+    resultat["dossier_ref"] = refs
+    resultat["score_fuzzy"] = scores
+    resultat["titre_dossier"] = titres
+    sans_denomination = int((resultat["denomination"].str.len() <= 10).sum())
+    logger.info("déports : %d rattachés à un dossier sur %d "
+                "(%d références ne nomment aucun texte)",
+                int(resultat["dossier_ref"].notna().sum()), len(resultat), sans_denomination)
+    return resultat

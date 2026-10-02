@@ -176,3 +176,46 @@ def test_precision_par_niveau(audit_factice):
     assert table.loc["1 - texte nommé", "precision"] == pytest.approx(2 / 3, abs=1e-3)
     # Au niveau 2, un « oui », un « non », un « incertain » exclu du dénominateur.
     assert table.loc["2 - voisinage thématique", "precision"] == pytest.approx(1 / 2, abs=1e-3)
+
+
+# --------------------------------------------------------------------------
+# Déports : même piège de similarité partielle, même garde-fou
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("reference", "attendu"), [
+    ("Projet de loi n° 2630 actualisant la programmation militaire pour les années "
+     "2024 à 2030", "actualisant la programmation militaire pour les annees 2024 a 2030"),
+    ("Article 19 de la proposition de loi n°1100 relative à la fin de vie",
+     "relative a la fin de vie"),
+    # Référence générique : aucun texte identifiable, et c'est le bon résultat.
+    ("Articles de loi ayant trait aux assurances et organismes complémentaires", ""),
+    (None, ""),
+])
+def test_denomination_deport(reference, attendu):
+    from lobbynomics.matching import denomination_deport
+    assert denomination_deport(reference) == attendu
+
+
+def test_denomination_deport_developpe_les_abreviations():
+    from lobbynomics.matching import denomination_deport
+    assert "financement de la securite sociale" in denomination_deport(
+        "Article 7 du PLFSS pour 2026")
+
+
+def test_rattachement_deport_refuse_un_titre_sans_rapport():
+    """Le scorer partiel rattachait ces références à « Allocution du Président d'âge »."""
+    from lobbynomics.matching import rattacher_deports
+    dossiers = pd.DataFrame([
+        {"dossier_ref": "D1", "titre": "Allocution du Président d'âge"},
+        {"dossier_ref": "D2", "titre": "Fin de vie"},
+    ])
+    deports = pd.DataFrame([
+        {"reference_textuelle": "Article 19 de la proposition de loi relative à la fin de vie",
+         "reference_normalisee": "article 19 de la proposition de loi relative a la fin de vie"},
+        {"reference_textuelle": "Articles de loi ayant trait aux assurances",
+         "reference_normalisee": "articles de loi ayant trait aux assurances"},
+    ])
+    resultat = rattacher_deports(deports, dossiers)
+    assert resultat.loc[0, "dossier_ref"] == "D2"
+    assert pd.isna(resultat.loc[1, "dossier_ref"])
