@@ -6,7 +6,7 @@ complétée par le TP1 et le courriel de la chargée de TD du 22 septembre 2026.
 ## Cadre
 
 * Groupes de 2 à 3 personnes ; sujet libre mais **à faire valider** par la
-  chargée de TD (Yasmine Benjelloun, `yasmine.benjelloun@polytechnique.edu`).
+  chargée de TD du cours.
 * Dépôt **GitHub public**, avec un historique de versions réel : les dépôts
   constitués d'un seul *upload* sont pénalisés, les commits fréquents et les
   pull requests valorisés.
