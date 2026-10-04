@@ -1,5 +1,7 @@
 # Cartographier l'influence déclarée des lobbies sur le travail législatif
 
+[![tests](https://github.com/nicolleremanto/Cartographier-lobbie-AssemNat-/actions/workflows/tests.yml/badge.svg)](https://github.com/nicolleremanto/Cartographier-lobbie-AssemNat-/actions/workflows/tests.yml)
+
 Projet du cours **Python pour la data science** (ENSAE, 2A — `CSC_4CS08_AE`).
 
 On croise quatre sources officielles pour une seule question : **la présence déclarée de
