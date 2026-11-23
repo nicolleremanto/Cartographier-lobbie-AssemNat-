@@ -106,7 +106,7 @@ docs/methode.md              le détail méthodologique et ses limites
 docs/sources.md              provenance, licences, dates de collecte
 docs/journal.md              journal de bord : décisions, erreurs, prochaines étapes
 docs/consignes.md            les consignes du cours et où elles sont traitées
-docs/rapport-explicatif.pdf  présentation du projet en 23 pages
+docs/rapport-explicatif.pdf  présentation du projet en 22 pages
 data/raw/                    sources brutes (hors Git)
 data/processed/              tables propres en parquet
 reports/figures/             les figures produites
