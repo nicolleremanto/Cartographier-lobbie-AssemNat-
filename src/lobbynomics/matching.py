@@ -271,28 +271,6 @@ def nomme_le_texte(objet_normalise: str, texte: config.TexteCible) -> bool:
     return any(alias in objet_normalise for alias in texte.alias)
 
 
-def fenetre_debat(dossiers: pd.DataFrame, texte: config.TexteCible,
-                  *, marge_mois: int | None = None) -> tuple[pd.Timestamp, pd.Timestamp]:
-    """Fenêtre temporelle du débat parlementaire, élargie d'une marge.
-
-    La marge est nécessaire parce que le lobbying précède le dépôt du texte : on
-    cherche les activités déclarées *autour* du débat, pas seulement pendant.
-    """
-    marge = config.MARGE_FENETRE_MOIS if marge_mois is None else marge_mois
-    ligne = dossiers.loc[dossiers["dossier_ref"] == texte.dossier_ref]
-    if ligne.empty:
-        raise KeyError(f"dossier {texte.dossier_ref} absent de la table des dossiers")
-    ligne = ligne.iloc[0]
-    debut = pd.to_datetime(ligne["date_premier_acte"])
-    fin = pd.to_datetime(ligne["date_dernier_acte"])
-    return (debut - pd.DateOffset(months=marge), fin + pd.DateOffset(months=marge))
-
-
-def _compte_mots_cles(objet_normalise: str, mots_cles: tuple[str, ...]) -> int:
-    return sum(1 for mot in mots_cles if mot in objet_normalise)
-
-
-
 def score_activites(activites: pd.DataFrame, dossiers: pd.DataFrame,
                     texte: config.TexteCible) -> pd.DataFrame:
     """Score chaque activité HATVP au regard d'un texte de loi.
