@@ -82,3 +82,26 @@ def test_chaque_texte_analyse_est_bien_configure(cle):
     assert texte.dossier_ref.startswith("DLR5L17")
     assert texte.alias, "un texte doit avoir au moins un alias pour être repérable"
     assert texte.mots_cles and texte.secteurs_hatvp
+
+
+def test_vote_final_non_identifiable_quel_que_soit_statsmodels():
+    """Séparation quasi complète : selon la version de statsmodels, l'ajustement
+    lève une LinAlgError ou ne converge pas. Dans les deux cas, le modèle doit être
+    déclaré non identifiable, jamais rendu avec des coefficients absurdes."""
+    import numpy as np
+
+    from lobbynomics.models import modele_vote_final
+
+    rng = np.random.default_rng(0)
+    lignes = []
+    for bloc, effectif, p in [("a", 40, 1.0), ("b", 40, 0.0), ("c", 60, 0.5)]:
+        for _ in range(effectif):
+            vote = int(p) if p in (0.0, 1.0) else int(rng.random() < p)
+            lignes.append({"a_vote": True, "bloc": bloc, "vote_pour": vote,
+                           "proximite_max": rng.random(),
+                           "interet_sectoriel_declare": bool(rng.random() < 0.3),
+                           "part_rurale": rng.random()})
+    sortie = modele_vote_final(pd.DataFrame(lignes))
+
+    assert sortie["identifiable"] is False
+    assert "coefficients" not in sortie

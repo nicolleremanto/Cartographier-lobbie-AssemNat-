@@ -139,6 +139,18 @@ def modele_vote_final(table: pd.DataFrame, texte_cle: str | None = None) -> dict
         sortie["erreur_ajustement"] = f"{type(err).__name__}: {err}"
         return sortie
 
+    # Selon la version de statsmodels, la séparation quasi complète lève une
+    # LinAlgError (ci-dessus) ou rend un ajustement non convergé, aux coefficients
+    # énormes et sans signification. Les deux cas reçoivent le même diagnostic,
+    # pour que le résultat ne dépende pas de l'environnement.
+    if not resultat.mle_retvals.get("converged", True):
+        logger.warning("vote final%s : ajustement impossible (non-convergence) — "
+                       "séparation quasi complète",
+                       f" [{texte_cle}]" if texte_cle else "")
+        sortie["identifiable"] = False
+        sortie["erreur_ajustement"] = "non-convergence du maximum de vraisemblance"
+        return sortie
+
     sortie.update({"identifiable": True, "resultat": resultat,
                    "coefficients": resume(resultat),
                    "pseudo_r2": float(resultat.prsquared)})
