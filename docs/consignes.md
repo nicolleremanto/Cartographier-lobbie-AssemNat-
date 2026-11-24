@@ -27,7 +27,7 @@ courriels du cours (22 septembre, 12 et 23 octobre 2026).
 | --- | --- | --- |
 | Données : collecte et nettoyage | 4 | `collect.py`, `parse_an.py`, `parse_hatvp.py` — 8 fichiers, 4 producteurs, ~700 Mo, API + téléchargements + XML lu en flux + dédoublonnage (51 % de doublons dans les déclarations) |
 | Analyse descriptive | 4 | notebook, parties 1 à 5 ; chaque chiffre et chaque figure sont commentés, 18 figures |
-| Démarche scientifique et reproductibilité | 5 | `pipeline.py` en une commande, manifeste de provenance SHA-256, `quality.py` (24 contrôles), `robustesse.py` (sensibilité + déterminisme), test placebo, 63 tests, CI GitHub Actions (tests + exécution du notebook sur un clone neuf), `docs/methode.md` |
+| Démarche scientifique et reproductibilité | 5 | `pipeline.py` en une commande, manifeste de provenance SHA-256, `quality.py` (24 contrôles), `robustesse.py` (sensibilité + déterminisme), test placebo, 67 tests, CI GitHub Actions (tests + exécution du notebook sur un clone neuf), `docs/methode.md` |
 | Format du code | 2 | 11 modules, un par étape ; le notebook n'appelle que des fonctions |
 | Soutenance | 5 | `docs/rapport-explicatif.pdf`, section « préparer la soutenance » |
 

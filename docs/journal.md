@@ -112,12 +112,20 @@
   de bout en bout en ~10 secondes sur un clone neuf.
 * La CI exécute maintenant aussi le notebook sur un clone neuf, pour que ce test
   ne repose plus sur une vérification manuelle.
+* Fusion avec le correctif d'Ariane (`pipeline.assurer_donnees`), qui avait trouvé
+  le même problème de son côté (8 cellules en erreur sur 51) et proposait de relancer
+  la collecte et le parsing. Les deux démarches sont gardées : l'instantané d'abord
+  (rapide, chiffres identiques au rapport), la reconstruction depuis les sources en
+  secours si l'instantané est inaccessible. La reconstruction va jusqu'au matching et
+  aux variables : la collecte et le parsing seuls ne produisent pas
+  `scrutins_rattaches` ni `interets_classes`, que le notebook lit aussi.
 
 **Décisions**
 
 | Décision | Raison |
 | --- | --- |
 | Instantané plutôt que relancer le pipeline dans le notebook | l'open data change tous les jours : relancer la collecte aurait donné des chiffres différents de ceux commentés, et 25 minutes d'exécution |
+| Garder la reconstruction depuis les sources en secours | si la release devenait inaccessible, le notebook doit encore tourner ; vérifié en simulant la panne |
 | Instantané en release plutôt que dans Git | 87 Mo de parquet n'ont rien à faire dans l'historique ; la release est versionnée et son empreinte est vérifiée |
 
 **Erreurs commises, et comment elles ont été vues**

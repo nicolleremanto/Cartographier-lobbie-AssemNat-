@@ -69,7 +69,9 @@ la première cellule récupère l'**instantané des données du 2 octobre 2026**
 en [release](https://github.com/nicolleremanto/Cartographier-lobbie-AssemNat-/releases/tag/donnees-2026-10-02),
 empreinte SHA-256 vérifiée), qui contient les tables trop lourdes pour Git. Le notebook
 s'exécute ensuite de bout en bout en moins d'une minute et redonne exactement les chiffres
-commentés. En ligne de commande : `make rapport`.
+commentés. Si l'instantané est inaccessible, la même cellule reconstruit les tables depuis
+les sources officielles (connexion requise, ~25 minutes, une seule fois). En ligne de
+commande : `make rapport`.
 
 ### Reconstruire depuis les sources brutes
 
@@ -128,7 +130,7 @@ docs/rapport-explicatif.pdf  présentation du projet en 22 pages
 data/raw/                    sources brutes (hors Git)
 data/processed/              tables propres en parquet
 reports/figures/             les figures produites
-tests/                       63 tests, centrés sur le matching et la qualité
+tests/                       67 tests, centrés sur le matching et la qualité
 ```
 
 ## Les textes étudiés
