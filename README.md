@@ -56,34 +56,51 @@ une commande.
 
 ## Installation et exécution
 
+### Relire le rapport (le test du correcteur : cloner → installer → Run All)
+
 ```bash
-git clone <url-du-depot>
-cd projet-lobbies-assemblee
+git clone https://github.com/nicolleremanto/Cartographier-lobbie-AssemNat-.git
+cd Cartographier-lobbie-AssemNat-
+pip install -r requirements.txt
+```
+
+Puis ouvrir `notebooks/rapport.ipynb` et faire **Run All** : c'est tout. Sur un clone neuf,
+la première cellule récupère l'**instantané des données du 2 octobre 2026** (87 Mo, publié
+en [release](https://github.com/nicolleremanto/Cartographier-lobbie-AssemNat-/releases/tag/donnees-2026-10-02),
+empreinte SHA-256 vérifiée), qui contient les tables trop lourdes pour Git. Le notebook
+s'exécute ensuite de bout en bout en moins d'une minute et redonne exactement les chiffres
+commentés. En ligne de commande : `make rapport`.
+
+### Reconstruire depuis les sources brutes
+
+```bash
 python -m venv .venv && source .venv/bin/activate
 make installation
-
 make pipeline        # collecte → parsing → matching → variables → qualité → modèles → robustesse → figures
 ```
 
 Compter ~25 minutes la première fois (8 de téléchargement, 15 de mise à plat des 126 392
 fichiers d'amendements), ~1 minute ensuite : rien n'est retéléchargé ni recalculé sans
-raison. Les autres cibles :
+raison. L'open data de l'Assemblée et le répertoire HATVP évoluant chaque jour, une
+reconstruction faite aujourd'hui donne les chiffres du jour, proches mais pas identiques
+à ceux du rapport ; le manifeste `data/raw/_manifeste.json` date chaque source. Les tables
+reconstruites priment toujours sur l'instantané, qui n'écrase rien.
+
+Les autres cibles :
 
 ```bash
+make instantane # récupère seulement l'instantané des données du rapport
 make rapide     # tout sauf collecte et parsing
 make qualite    # les 24 contrôles de qualité des données
-make tests      # 58 tests
+make tests      # suite de tests
 make rapport    # exécute le notebook de bout en bout
 make            # la liste des cibles
 ```
 
-Le rapport se lit dans `notebooks/rapport.ipynb`, qui ne fait que **relire** les tables de
-`data/processed/` : aucune cellule ne retélécharge quoi que ce soit, et le notebook
-s'exécute de bout en bout en moins d'une minute.
-
-Une **intégration continue** (GitHub Actions) lance les tests à chaque poussée, sur Python
-3.11 et 3.12. Elle ne télécharge aucune donnée : une CI qui dépend de 700 Mo d'open data
-tombe en panne le jour où une source change d'URL, pour une raison étrangère au code.
+Une **intégration continue** (GitHub Actions) vérifie à chaque poussée, sur Python 3.11 et
+3.12, que les tests passent **et que le notebook s'exécute de bout en bout sur un clone
+neuf** (Run All, à partir de l'instantané). Les tests eux-mêmes ne téléchargent aucune
+donnée : ils portent sur la logique, avec des tables fabriquées à la main.
 
 ## Organisation du dépôt
 
@@ -98,6 +115,7 @@ src/lobbynomics/
 ├── models.py       quatre régressions logistiques
 ├── quality.py      24 contrôles de qualité des données
 ├── robustesse.py   sensibilité aux choix arbitraires, déterminisme
+├── instantane.py   récupération de l'instantané des données du rapport (clone neuf)
 ├── viz.py          les 18 figures du rapport
 └── pipeline.py     orchestration (python -m lobbynomics.pipeline)
 
@@ -110,7 +128,7 @@ docs/rapport-explicatif.pdf  présentation du projet en 22 pages
 data/raw/                    sources brutes (hors Git)
 data/processed/              tables propres en parquet
 reports/figures/             les figures produites
-tests/                       58 tests, centrés sur le matching et la qualité
+tests/                       63 tests, centrés sur le matching et la qualité
 ```
 
 ## Les textes étudiés

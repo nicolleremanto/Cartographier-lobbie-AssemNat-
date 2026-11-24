@@ -82,19 +82,20 @@ une relecture manuelle le révèle.}
 \textbf{Chemin} & \textbf{Ce que c'est} \\
 \midrule
 \fichier{notebooks/rapport.ipynb} & \textbf{Le rendu.} Le rapport académique, 92 cellules,
-s'exécute en moins d'une minute sans erreur. \\
+s'exécute en moins d'une minute sans erreur, y compris sur un clone neuf. \\
 \fichier{src/lobbynomics/} & Le code, neuf modules, un par étape du raisonnement. \\
 \fichier{docs/methode.md} & Le détail méthodologique et toutes les limites. \\
 \fichier{docs/sources.md} & Provenance, licences, pièges de chaque source. \\
 \fichier{docs/journal.md} & Journal de bord : décisions, erreurs, prochaines étapes. \\
 \fichier{data/raw/} & Les 700~Mo de sources brutes (hors Git, retéléchargeables). \\
 \fichier{reports/figures/} & Les 18 figures. \\
-\fichier{tests/} & 58 tests. \\
+\fichier{tests/} & 63 tests. \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Tout se relance par une commande : \fichier{make pipeline}.
+Clone neuf : installer puis \emph{Run All} (l'instantané des données se télécharge seul).
+Reconstruction depuis les sources : \fichier{make pipeline}.
 
 \newpage
 % =====================================================================
@@ -783,9 +784,10 @@ aucune logique n'y est écrite, ce qui est explicitement demandé par les consig
 \toprule
 \textbf{Commande} & \textbf{Effet} \\
 \midrule
+\fichier{make instantane} & récupère seulement l'instantané des données du rapport \\
 \fichier{make pipeline} & la chaîne complète, de l'URL aux figures \\
 \fichier{make rapide} & tout sauf le téléchargement et la mise à plat ($\approx$~1~min) \\
-\fichier{make tests} & les 58 tests \\
+\fichier{make tests} & les 63 tests \\
 \fichier{make rapport} & exécute le notebook de bout en bout \\
 \fichier{make qualite} & les contrôles de qualité seuls \\
 \bottomrule
@@ -793,9 +795,9 @@ aucune logique n'y est écrite, ce qui est explicitement demandé par les consig
 \end{center}
 
 Une \textbf{intégration continue} GitHub Actions lance les tests à chaque poussée, sur
-Python 3.11 et 3.12. Elle ne télécharge aucune donnée : une CI qui dépend de 700~Mo
-d'open data tombe en panne le jour où une source change d'URL, pour une raison qui n'a
-rien à voir avec le code.
+Python 3.11 et 3.12, et rejoue le test du correcteur : clone neuf, installation, puis
+exécution du notebook de bout en bout à partir de l'instantané. Elle ne dépend pas des
+700~Mo d'open data, dont les URL peuvent changer.
 
 % =====================================================================
 \section{Préparer la soutenance}
@@ -829,7 +831,7 @@ corrélation serait la même sans aucune influence. \\
 style. Et il a appris quelque chose : c'est le témoin qui est significatif, pas la vraie
 mesure. \\
 « Votre projet est-il reproductible ? » & Une commande, un manifeste de provenance avec
-empreintes SHA-256, 58 tests, une CI, et une vérification que deux exécutions donnent
+empreintes SHA-256, 63 tests, une CI, et une vérification que deux exécutions donnent
 exactement les mêmes nombres. \\
 \bottomrule
 \end{longtable}

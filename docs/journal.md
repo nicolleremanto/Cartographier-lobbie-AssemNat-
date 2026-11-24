@@ -97,3 +97,33 @@
       difficile.
 - [ ] Tester une mesure de proximité sémantique (embeddings de phrases) contre
       le TF-IDF, qui ne distingue pas deux positions opposées sur le même sujet.
+
+## 24 novembre 2026 — vérification du rendu (clone neuf → installation → Run All)
+
+**Fait**
+
+* Test du correcteur rejoué : cloner le dépôt dans un dossier vide, installer
+  `requirements.txt`, exécuter le notebook. **Il échouait dès la deuxième cellule** :
+  les tables lourdes (`an_votes`, `hatvp_activites`…) et le manifeste ne sont pas dans
+  Git, et le notebook supposait `make pipeline` déjà lancé.
+* Module `instantane.py` : si une table manque, la première cellule récupère
+  l'instantané des tables du 2 octobre (87 Mo, release `donnees-2026-10-02`, SHA-256
+  vérifié) sans jamais écraser une table reconstruite. Le notebook passe désormais
+  de bout en bout en ~10 secondes sur un clone neuf.
+* La CI exécute maintenant aussi le notebook sur un clone neuf, pour que ce test
+  ne repose plus sur une vérification manuelle.
+
+**Décisions**
+
+| Décision | Raison |
+| --- | --- |
+| Instantané plutôt que relancer le pipeline dans le notebook | l'open data change tous les jours : relancer la collecte aurait donné des chiffres différents de ceux commentés, et 25 minutes d'exécution |
+| Instantané en release plutôt que dans Git | 87 Mo de parquet n'ont rien à faire dans l'historique ; la release est versionnée et son empreinte est vérifiée |
+
+**Erreurs commises, et comment elles ont été vues**
+
+* Le logit du vote final dépendait de la version de statsmodels : avec une version
+  récente, la séparation quasi complète ne lève plus d'erreur, l'ajustement « réussit »
+  sans converger (coefficients de ±48, écarts-types de ~15 000) et le modèle était
+  affiché comme identifiable. Vu en comparant les sorties du notebook avant et après
+  réexécution. On teste désormais la convergence ; test ajouté.
