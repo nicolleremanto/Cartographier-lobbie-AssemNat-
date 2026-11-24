@@ -1,10 +1,13 @@
 # Intégration continue.
 #
-# Les tests ne téléchargent aucune donnée : ils portent sur la logique de
-# rapprochement et sur les contrôles qualité, avec des tables fabriquées à la
-# main. C'est délibéré — une CI qui dépend de 700 Mo d'open data tombe en panne
-# le jour où une source change d'URL, pour une raison qui n'a rien à voir avec
-# le code.
+# Deux vérifications à chaque poussée :
+# * les tests, qui ne téléchargent aucune donnée : ils portent sur la logique de
+#   rapprochement et sur les contrôles qualité, avec des tables fabriquées à la
+#   main ;
+# * le test du correcteur : sur un clone neuf, installer requirements.txt puis
+#   exécuter le notebook de bout en bout (Run All). Le notebook récupère seul
+#   l'instantané des données du rapport, publié en release ; la CI ne dépend
+#   donc pas des 700 Mo d'open data, dont les URL peuvent changer.
 name: tests
 
 on:
@@ -39,3 +42,24 @@ jobs:
 
       - name: Lancer les tests
         run: python -m pytest -q
+
+  notebook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run All sur un clone neuf
+        run: |
+          jupyter nbconvert --to notebook --execute notebooks/rapport.ipynb \
+            --output rapport_execute.ipynb --ExecutePreprocessor.timeout=900
