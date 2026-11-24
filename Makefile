@@ -1,8 +1,10 @@
 # Raccourcis du projet. « make » seul affiche l'aide.
 .DEFAULT_GOAL := aide
-.PHONY: aide installation donnees pipeline rapide qualite tests rapport figures propre tout
+.PHONY: aide installation instantane donnees pipeline rapide qualite tests rapport figures propre tout
 
 PYTHON ?= python
+# Le paquet vit dans src/ : on le rend importable sans exiger « pip install -e . ».
+export PYTHONPATH := $(CURDIR)/src$(if $(PYTHONPATH),:$(PYTHONPATH))
 PIPELINE := $(PYTHON) -m lobbynomics.pipeline
 
 aide:                     ## affiche cette aide
@@ -11,6 +13,9 @@ aide:                     ## affiche cette aide
 
 installation:             ## installe les dépendances
 	$(PYTHON) -m pip install -r requirements.txt
+
+instantane:               ## récupère l'instantané des données du rapport (87 Mo, sans pipeline)
+	$(PYTHON) -m lobbynomics.instantane
 
 donnees:                  ## télécharge et décompresse les sources officielles (~700 Mo)
 	$(PIPELINE) --etapes collecte parsing
