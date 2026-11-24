@@ -24,8 +24,9 @@ import time
 from typing import Any
 
 import pandas as pd
+import requests
 
-from . import (collect, config, features, matching, models, parse_an, parse_hatvp,
+from . import (collect, config, features, instantane, matching, models, parse_an, parse_hatvp,
                quality, robustesse, viz)
 
 logger = logging.getLogger(__name__)
@@ -276,6 +277,44 @@ def etape_figures() -> list[str]:
 # --------------------------------------------------------------------------
 # Point d'entrée
 # --------------------------------------------------------------------------
+
+
+# Tables lues par le notebook et absentes de Git (trop lourdes ou intermédiaires).
+TABLES_NOTEBOOK = instantane.TABLES
+
+# Étapes qui produisent ces tables quand on repart des sources brutes : la collecte et le
+# parsing ne suffisent pas (scrutins_rattaches vient du matching, interets_classes des
+# variables d'analyse).
+ETAPES_RECONSTRUCTION = ("collecte", "parsing", "matching", "features")
+
+
+def donnees_presentes() -> bool:
+    """Vrai si le manifeste et toutes les tables lues par le notebook sont sur le disque."""
+    return not instantane.fichiers_manquants()
+
+
+def assurer_donnees() -> str | None:
+    """Garantit que le notebook peut s'exécuter de bout en bout, même sur un clone neuf.
+
+    1. Si tout est là, ne fait rien et renvoie ``None``.
+    2. Sinon, récupère l'instantané du 2 octobre 2026 (87 Mo, quelques secondes) : il
+       redonne exactement les chiffres commentés dans le notebook. Renvoie ``"instantane"``.
+    3. Si l'instantané est inaccessible ou corrompu, reconstruit depuis les sources
+       officielles (connexion requise, ~25 min, une seule fois). Les chiffres sont alors
+       ceux du jour, l'open data évoluant. Renvoie ``"pipeline"``.
+    """
+    if donnees_presentes():
+        return None
+    try:
+        instantane.preparer_donnees()
+        if donnees_presentes():
+            return "instantane"
+        logger.warning("instantané incomplet : reconstruction depuis les sources")
+    except (requests.RequestException, ValueError, OSError) as err:
+        logger.warning("instantané inaccessible (%s) : reconstruction depuis les sources",
+                       type(err).__name__)
+    executer(ETAPES_RECONSTRUCTION)
+    return "pipeline"
 
 
 def executer(etapes: tuple[str, ...] = ETAPES, *, force: bool = False,
