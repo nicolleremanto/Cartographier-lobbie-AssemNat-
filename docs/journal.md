@@ -13,7 +13,8 @@
   le champ `uri_hatvp` des acteurs de l'Assemblée pointe exactement sur la fiche
   HATVP du député — une clé exacte offerte par la source, là où on s'attendait à
   devoir rapprocher des noms.
-* Quatrième source ajoutée (API Géo) pour construire un indicateur rural/urbain.
+* Référentiel ajouté (API Géo) pour construire un indicateur rural/urbain par
+  département.
 * Chaîne complète écrite et exécutée : collecte → parsing → matching → variables
   → modèles → figures.
 * 32 tests, centrés sur le matching et les cas limites du JSON de l'Assemblée.

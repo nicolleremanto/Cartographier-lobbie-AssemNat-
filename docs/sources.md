@@ -2,8 +2,8 @@
 
 Toutes les sources sont publiques, en accès libre, sans authentification ni clé
 d'API. Le manifeste `data/raw/_manifeste.json`, écrit par `collect.py`,
-enregistre pour chaque fichier son URL, sa taille, une empreinte SHA-256 et
-l'horodatage de récupération : c'est lui qui permet de dire quelle version des
+enregistre pour chaque fichier son URL, sa taille, l'empreinte SHA-256 de son
+premier mégaoctet (champ `sha256_premier_mo`) et l'horodatage de récupération : c'est lui qui permet de dire quelle version des
 données a produit les résultats du rapport.
 
 Collecte de référence : **2 octobre 2026**.

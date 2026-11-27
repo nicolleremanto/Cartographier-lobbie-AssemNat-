@@ -210,13 +210,13 @@ toujours rien d'une influence.
 
 ---
 
-## 6. Trois modèles, dans l'ordre d'un argument
+## 6. Cinq modèles, dans l'ordre d'un argument
 
 ### 6.1 Le vote final : un échec informatif
 
 Logit du vote sur l'ensemble du texte en fonction du bloc politique. Le modèle
-**ne converge pas** : la matrice hessienne est singulière, parce que cinq blocs
-sur sept votent à 0 % ou 100 %. Ce n'est pas un bug à contourner, c'est le
+**ne converge pas** : la matrice hessienne est singulière, parce que quatre blocs
+sur sept votent à 0 % ou 100 % et que le centre vote « pour » à 99,8 %. Ce n'est pas un bug à contourner, c'est le
 résultat.
 
 Mesure de substitution, lisible : la règle « chaque député vote comme la majorité
@@ -245,7 +245,7 @@ Effets marginaux moyens, en points de probabilité :
 | proximité lexicale avec les lobbies (+1 écart-type) | +0,34 pt | 0,080 |
 | intérêt sectoriel déclaré | +0,72 pt | 0,082 |
 | a déposé un amendement sur le texte | −1,09 pt | 0,031 |
-| ruralité de la circonscription (+1 écart-type) | +0,00 pt | 0,982 |
+| part rurale du département (+1 écart-type) | +0,00 pt | 0,982 |
 | membre de la commission saisie au fond | −0,20 pt | 0,494 |
 
 Pseudo-R² = 0,077, n = 87 914, 537 députés.
@@ -301,13 +301,13 @@ secteur, et ce taux est une limite, pas un détail.
 
 Modèle : probabilité qu'un député dépose au moins un amendement sur un texte, en fonction
 de son intérêt déclaré dans le secteur, de son appartenance à la commission saisie au
-fond, de la ruralité de sa circonscription et de son bloc (n = 1 639 députés-textes).
+fond, de la part rurale de son département d'élection et de son bloc (n = 1 639 députés-textes).
 
 | Variable | Odds ratio | p |
 | --- | --- | --- |
 | intérêt déclaré dans le secteur du texte | **3,01** | 0,0003 |
 | membre de la commission saisie au fond | **13,66** | < 0,0001 |
-| ruralité de la circonscription (+1 écart-type) | 1,17 | 0,060 |
+| part rurale du département (+1 écart-type) | 1,17 | 0,060 |
 
 C'est la seule relation du projet qui n'exige **aucune inférence** : les intérêts sont
 déclarés par le député, et le dépôt d'un amendement est un fait. Mais ce n'est pas une
