@@ -367,9 +367,10 @@ make            # la liste des cibles
 
 ### Intégration continue
 
-À chaque poussée, GitHub Actions vérifie sur Python 3.11 et 3.12 que les 67 tests
-passent, **et que le notebook s'exécute de bout en bout sur un clone neuf** (Run All, à
-partir de l'instantané). Les tests ne téléchargent aucune donnée : ils portent sur la
+À chaque poussée, GitHub Actions vérifie que les 67 tests passent sous Python 3.11 et
+3.12, **et que le notebook s'exécute de bout en bout sur un clone neuf** sous Python 3.12
+(Run All, à partir de l'instantané). Le Run All a aussi été vérifié sous Python 3.13 et
+3.14. Les tests ne téléchargent aucune donnée : ils portent sur la
 logique, avec des tables fabriquées à la main.
 
 ## Organisation du dépôt
