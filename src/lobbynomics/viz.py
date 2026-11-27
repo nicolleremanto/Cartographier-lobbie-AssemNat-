@@ -91,9 +91,12 @@ def _etiquettes_blocs(blocs) -> list[str]:
 
 def _habiller(ax, titre: str, sous_titre: str = "", source: str = ""):
     """Titre (= la conclusion de la figure), sous-titre (= ce qui est mesuré), source."""
-    ax.set_title(titre, loc="left", pad=26 if sous_titre else 10)
+    sous_titre = textwrap.fill(sous_titre, 100)
+    # Un sous-titre replié sur deux lignes repousse le titre d'autant, sinon ils se chevauchent.
+    lignes = sous_titre.count("\n") + 1 if sous_titre else 0
+    ax.set_title(titre, loc="left", pad=13 + 13 * lignes if sous_titre else 10)
     if sous_titre:
-        ax.text(0, 1.015, textwrap.fill(sous_titre, 100), transform=ax.transAxes,
+        ax.text(0, 1.015, sous_titre, transform=ax.transAxes,
                 fontsize=9, color="#555555", va="bottom")
     if source:
         ax.annotate(textwrap.fill(source, 115), xy=(0, 0), xycoords="axes fraction",
@@ -138,8 +141,10 @@ def figure_intensite_lobbying(ciblage: pd.DataFrame) -> plt.Figure:
     """Ce que chaque niveau de ciblage retient, texte par texte.
 
     Deux barres par texte, en échelle log : le niveau 1 (le texte est nommé dans
-    l'objet déclaré) est deux ordres de grandeur plus petit que le niveau 2
-    (simple voisinage thématique). L'écart est le message de la figure.
+    l'objet déclaré) et le niveau 2 (simple voisinage thématique) ne retiennent
+    pas les mêmes volumes, et l'écart change de sens d'un texte à l'autre
+    (agriculture : 29 contre 904 ; fraudes : 165 contre 16). C'est le message
+    de la figure.
     """
     agr = (ciblage.groupby("texte_cle")
            .agg(niveau1=("cible_nommee", "sum"), niveau2=("cible_thematique", "sum"))
@@ -158,7 +163,7 @@ def figure_intensite_lobbying(ciblage: pd.DataFrame) -> plt.Figure:
     ax.set_ylabel("activités déclarées retenues (échelle log)")
     ax.set_xticks(x, agr.index)
     ax.legend()
-    _habiller(ax, "Exiger que le texte soit nommé divise le volume retenu par vingt à cinquante",
+    _habiller(ax, "Texte nommé contre thème : 31 fois moins en agriculture, 10 fois plus sur les fraudes",
               "activités du répertoire HATVP retenues par chacun des deux niveaux de ciblage",
               "Sources : répertoire HATVP des représentants d'intérêts × dossiers législatifs AN. "
               "Le texte « logement » n'est nommé par aucune activité : il sert de cas témoin.")
@@ -241,7 +246,7 @@ def figure_votes_par_bloc(table: pd.DataFrame) -> plt.Figure:
     ax.set_ylabel("% de votes « pour »")
     ax.set_ylim(0, 105)
     ax.legend(title="texte")
-    _habiller(ax, "Le vote final se lit entièrement dans l'appartenance de bloc",
+    _habiller(ax, "Le vote final se lit dans l'appartenance de bloc, sauf à gauche sur la défense",
               "part de votes favorables à l'ensemble du texte (votes exprimés)",
               "Source : scrutins publics, Assemblée nationale, XVIIe législature.")
     return fig
@@ -474,7 +479,7 @@ def figure_placebo(amendements: pd.DataFrame) -> plt.Figure:
                     ha="right", fontsize=8.5, color="#444444")
     axes[0].set_ylabel("nombre d'amendements")
     axes[0].legend(fontsize=8.5, loc="center right")
-    fig.suptitle("La proximité mesurée est bien sectorielle, pas stylistique",
+    fig.suptitle("La proximité mesurée n'est pas que stylistique : elle est plus forte avec les lobbies du texte",
                  x=0.005, ha="left", fontweight="bold", fontsize=12)
     fig.text(0.005, -0.02,
              "Lecture : pour chaque amendement, similarité maximale avec les objets déclarés des "
