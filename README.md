@@ -87,8 +87,9 @@ aucune base : il faut la construire, et la mesure construite est indirecte.
 ## La démarche en six étapes
 
 1. **Collecte.** Huit fichiers officiels (environ 700 Mo) sont téléchargés par une
-   commande. Un manifeste enregistre l'URL, la date et une empreinte SHA-256 de chacun :
-   on sait quelle version des données a produit chaque chiffre.
+   commande. Un manifeste enregistre pour chacun l'URL, la date, la taille et
+   l'empreinte SHA-256 de son premier mégaoctet : on sait quelle version des données a
+   produit chaque chiffre.
 2. **Mise à plat.** Les fichiers JSON et XML, très imbriqués, deviennent des tables (un
    vote, un amendement, une activité par ligne), soumises à 24 contrôles de qualité.
 3. **Rapprochement.** C'est le cœur du travail : relier chaque scrutin à son texte en
@@ -121,7 +122,7 @@ d'API. Collecte de référence : **2 octobre 2026**.
 | [Amendements](https://data.assemblee-nationale.fr/static/openData/repository/17/loi/amendements_div_legis/Amendements.json.zip), XVIIe législature | [Assemblée nationale](https://data.assemblee-nationale.fr/) | **126 392 amendements** | auteur, article visé, exposé des motifs, sort |
 | [Dossiers législatifs](https://data.assemblee-nationale.fr/static/openData/repository/17/loi/dossiers_legislatifs/Dossiers_Legislatifs.json.zip) | [Assemblée nationale](https://data.assemblee-nationale.fr/) | 2 971 dossiers | titres, étapes, fenêtres de débat |
 | [Acteurs, mandats, organes et déports](https://data.assemblee-nationale.fr/static/openData/repository/17/amo/tous_acteurs_mandats_organes_xi_legislature/AMO30_tous_acteurs_tous_mandats_tous_organes_historique.json.zip) | [Assemblée nationale](https://data.assemblee-nationale.fr/) | 649 députés, 10 817 organes, 59 déports | groupe, commission, circonscription, lien vers la fiche HATVP |
-| [API Géo](https://geo.api.gouv.fr/communes?fields=code,nom,population,surface,departement&format=json) | Etalab | 34 955 communes | densité et part rurale par département |
+| [API Géo](https://geo.api.gouv.fr/communes?fields=code,nom,population,surface,departement&format=json) | Etalab | 34 955 communes | densité et part rurale du département d'élection |
 
 Provenance, licences et pièges de chaque fichier : [`docs/sources.md`](docs/sources.md).
 
@@ -155,8 +156,8 @@ une à une dans le notebook. Les sept reprises ici suivent l'ordre du raisonneme
 et celui du dossier. En bleu, la précision (part des rattachements corrects) ; en rouge,
 la couverture (part des scrutins rattachés). Le trait pointillé marque le seuil retenu.
 
-**Ce qu'on en conclut.** Les 2 608 scrutins qui portent déjà un lien officiel servent de
-corrigé. Entre les seuils 75 et 80, la précision saute de 84,6 % à 99,5 % et la
+**Ce qu'on en conclut.** Les 2 608 scrutins qui portent déjà un lien officiel et un
+titre exploitable servent de corrigé. Entre les seuils 75 et 80, la précision saute de 84,6 % à 99,5 % et la
 couverture tombe de 98 % à 83 % : en dessous de 80, on rattache des textes seulement
 voisins. On accepte donc de perdre un sixième des scrutins plutôt que de travailler sur
 un sixième de lignes fausses. La similarité de titre seule plafonnait à 95,7 % :
@@ -203,7 +204,7 @@ aucune variation à expliquer, et une régression logistique sur ce vote ne peut
 estimée : chercher un effet du lobbying à ce niveau n'aurait pas de sens.
 
 **Limites.** La figure porte sur la première lecture ; en deuxième lecture, la règle
-explique encore de 93 à 99 % des votes. Elle ne dit rien de ce qui forme la position
+explique encore de 92 à 98 % des votes. Elle ne dit rien de ce qui forme la position
 d'un bloc.
 
 ### 4. La proximité avec les lobbies ne prédit pas la dissidence
@@ -334,8 +335,8 @@ sont pas dans Git. Deux choses permettent pourtant de relire le rapport sans att
 * les tables trop lourdes pour Git sont publiées dans un **instantané des données du
   2 octobre 2026** (87 Mo, en
   [release](https://github.com/nicolleremanto/Cartographier-lobbie-AssemNat-/releases/tag/donnees-2026-10-02)),
-  que la première cellule du notebook télécharge seule et dont l'empreinte SHA-256 est
-  vérifiée.
+  que la première cellule du notebook télécharge seule et dont l'empreinte SHA-256,
+  calculée sur l'archive entière, est vérifiée.
 
 Si l'instantané est inaccessible, la même cellule reconstruit les tables depuis les
 sources officielles (environ 25 minutes, une seule fois).
@@ -367,8 +368,8 @@ make            # la liste des cibles
 
 ### Intégration continue
 
-À chaque poussée, GitHub Actions vérifie que les 67 tests passent sous Python 3.11 et
-3.12, **et que le notebook s'exécute de bout en bout sur un clone neuf** sous Python 3.12
+À chaque poussée, GitHub Actions lance deux jobs : les 67 tests, sous Python 3.11 et
+3.12, **et l'exécution du notebook de bout en bout sur un clone neuf** sous Python 3.12
 (Run All, à partir de l'instantané). Le Run All a aussi été vérifié sous Python 3.13 et
 3.14. Les tests ne téléchargent aucune donnée : ils portent sur la
 logique, avec des tables fabriquées à la main.
@@ -383,7 +384,7 @@ src/lobbynomics/
 ├── parse_hatvp.py  mise à plat du répertoire, des déclarations et de l'API Géo
 ├── matching.py     rapprochement des bases, et sa validation chiffrée
 ├── features.py     tables d'analyse, proximité lexicale, test placebo
-├── models.py       quatre régressions logistiques
+├── models.py       cinq modèles logistiques, dont quatre estimés
 ├── quality.py      24 contrôles de qualité des données
 ├── robustesse.py   sensibilité aux choix arbitraires, déterminisme
 ├── instantane.py   récupération de l'instantané des données du rapport (clone neuf)
@@ -395,7 +396,6 @@ docs/methode.md              le détail méthodologique et ses limites
 docs/sources.md              provenance, licences, dates de collecte
 docs/journal.md              journal de bord : décisions, erreurs, prochaines étapes
 docs/consignes.md            les consignes du cours et où elles sont traitées
-docs/rapport-explicatif.pdf  présentation du projet en 22 pages
 data/raw/                    sources brutes (hors Git)
 data/processed/              tables propres en parquet
 reports/figures/             les figures produites

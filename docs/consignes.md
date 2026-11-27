@@ -25,11 +25,11 @@ courriels du cours (22 septembre, 12 et 23 octobre 2026).
 
 | Poste | Points | Où c'est traité |
 | --- | --- | --- |
-| Données : collecte et nettoyage | 4 | `collect.py`, `parse_an.py`, `parse_hatvp.py` — 8 fichiers, 4 producteurs, ~700 Mo, API + téléchargements + XML lu en flux + dédoublonnage (51 % de doublons dans les déclarations) |
+| Données : collecte et nettoyage | 4 | `collect.py`, `parse_an.py`, `parse_hatvp.py` — 8 fichiers, 3 producteurs (HATVP, Assemblée nationale, Etalab), ~700 Mo, API + téléchargements + XML lu en flux + dédoublonnage (51 % de doublons dans les déclarations) |
 | Analyse descriptive | 4 | notebook, parties 1 à 5 ; chaque chiffre et chaque figure sont commentés, 18 figures |
-| Démarche scientifique et reproductibilité | 5 | `pipeline.py` en une commande, manifeste de provenance SHA-256, `quality.py` (24 contrôles), `robustesse.py` (sensibilité + déterminisme), test placebo, 67 tests, CI GitHub Actions (tests + exécution du notebook sur un clone neuf), `docs/methode.md` |
+| Démarche scientifique et reproductibilité | 5 | `pipeline.py` en une commande, manifeste de provenance (taille et SHA-256 du premier Mo de chaque fichier), `quality.py` (24 contrôles), `robustesse.py` (sensibilité + déterminisme), test placebo, 67 tests, CI GitHub Actions (tests + exécution du notebook sur un clone neuf), `docs/methode.md` |
 | Format du code | 2 | 12 modules, un par étape ; le notebook n'appelle que des fonctions |
-| Soutenance | 5 | `docs/rapport-explicatif.pdf`, section « préparer la soutenance » |
+| Soutenance | 5 | le récit du README et du notebook ; trois ou quatre figures clés |
 
 ## Points explicitement exigés, et leur traitement ici
 
@@ -40,8 +40,8 @@ courriels du cours (22 septembre, 12 et 23 octobre 2026).
   l'instantané des données du rapport si une table manque, puis le notebook
   s'exécute de bout en bout en moins d'une minute. La CI rejoue ce test à chaque
   poussée. La chaîne complète depuis les sources brutes tient dans `make pipeline`.
-* **Données accessibles par URL publique** → les sept sources sont des URL
-  ouvertes, listées dans `config.SOURCES` et vérifiées par le manifeste.
+* **Données accessibles par URL publique** → les huit fichiers sources sont des URL
+  ouvertes, listées dans `config.SOURCES` et tracées par le manifeste.
 * **Pas de fichiers volumineux dans Git** → `data/raw/` et `data/interim/` sont
   ignorés ; seules les tables d'analyse légères sont versionnées.
 * **Dépendances déclarées** → `requirements.txt` et `pyproject.toml`.
@@ -51,7 +51,7 @@ courriels du cours (22 septembre, 12 et 23 octobre 2026).
   et de ne pas le commenter »** → chaque figure porte un titre qui est sa
   conclusion, et chaque sortie est suivie d'un commentaire.
 * **Effort de collecte valorisé** (croisement de plusieurs sources, API,
-  scraping multi-pages) → quatre producteurs de données, sept fichiers, une API,
+  scraping multi-pages) → trois producteurs de données, huit fichiers dont un servi par une API,
   et surtout un travail de rapprochement sans clé commune, qui est le cœur du
   projet.
 * **Au moins une dimension approfondie** → c'est le **matching**, avec sa
@@ -64,4 +64,4 @@ courriels du cours (22 septembre, 12 et 23 octobre 2026).
       soutenance le 4 décembre 2026.
 - [x] Notebook vérifié sur un clone neuf (installation puis Run All).
 - [ ] Soutenance : 3 ou 4 graphiques, partir de la question, résultats clés
-      seulement (voir `docs/rapport-explicatif.pdf`).
+      seulement.
