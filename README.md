@@ -4,6 +4,12 @@
 
 Projet du cours **Python pour la data science** (ENSAE, 2A — `CSC_4CS08_AE`).
 
+## Membres du groupe
+
+Rémi Nicolle, Ariane Klingler, Jonathan Cador.
+
+## La question
+
 On croise quatre sources officielles pour une seule question : **la présence déclarée de
 lobbies sur un texte de loi laisse-t-elle une trace observable dans le travail et les
 votes des députés ?**
@@ -54,7 +60,104 @@ surtout ce qu'on ne peut pas, en conclure.
 Environ **700 Mo** de sources brutes, aucune authentification, tout retéléchargeable par
 une commande.
 
-## Installation et exécution
+### Les textes étudiés
+
+Quatre textes de la XVIIe législature, choisis parce que le lobbying y est documenté et
+les volumes suffisants :
+
+| Clé | Texte | Scrutins | Amendements | Activités HATVP nommant le texte |
+| --- | --- | --- | --- | --- |
+| `agriculture` | Projet de loi d'urgence pour la protection et la souveraineté agricoles | 422 | 1 592 | 29 |
+| `defense` | Projet de loi actualisant la programmation militaire 2024-2030 | 292 | 572 | 14 |
+| `fraudes` | Projet de loi relatif à la lutte contre les fraudes sociales et fiscales | 262 | 747 | 165 |
+| `logement` | Pour la mobilisation de l'habitat existant | 23 | 68 | **0** |
+
+Le texte `logement` est conservé comme **cas témoin** : aucune activité HATVP ne le nomme,
+alors que 419 activités lui sont thématiquement proches. C'est la démonstration la plus
+simple que « proximité de thème » n'est pas « ciblage ».
+
+## Rapprocher les bases
+
+Aucune clé commune ne relie ces sources : une activité du répertoire HATVP ne porte ni
+numéro de texte ni date précise, seulement un objet en texte libre et une année. Le
+rapprochement est donc une inférence, dont on mesure le taux d'erreur.
+
+![Précision et couverture du rattachement scrutin-dossier selon le seuil de similarité](reports/figures/01_qualite_matching.png)
+
+**Scrutin → dossier législatif.** 5 826 scrutins sur 8 455 n'ont aucun lien explicite vers
+leur dossier ; on les rattache par similarité de titre, puis arbitrage par la date. Les
+2 608 scrutins déjà liés servent de vérité terrain : au seuil retenu (88), la précision
+atteint 99,5 % pour une couverture de 83 %. Limite : les titres qui ne nomment aucun texte
+restent non rattachés.
+
+![Nombre d'activités HATVP retenues par texte, selon que le texte est nommé ou seulement proche par le thème](reports/figures/02_intensite_lobbying.png)
+
+**Activité HATVP → texte.** Deux niveaux : le texte est **nommé** dans l'objet déclaré
+(niveau 1, seul utilisé dans les modèles) ou seulement proche par le thème (niveau 2,
+descriptif). Pour la loi agricole, on passe de 904 activités à 29 ; pour `logement`, de
+419 à 0. Limite : l'ordre de grandeur du titre de la figure vaut pour l'agriculture, pas
+pour `fraudes`, où le texte est nommé plus souvent (165) qu'il n'est approché par le thème
+(16) ; et la validation repose sur 60 paires relues à la main, stratifiées, dont les
+précisions ne s'extrapolent pas en taux global.
+
+## Les résultats en figures
+
+Les 18 figures sont dans [`reports/figures/`](reports/figures/) et commentées une à une
+dans [`notebooks/rapport.ipynb`](notebooks/rapport.ipynb) ; sept sont reprises ici, dont
+cinq pour les résultats.
+
+### Le vote final se lit dans l'appartenance de bloc
+
+![Part de votes favorables à l'ensemble du texte, par bloc politique et par texte](reports/figures/04_votes_par_bloc.png)
+
+Presque tous les blocs votent à 0 % ou à 100 % : la règle « chacun vote comme son bloc »
+se trompe sur 3 votes sur 547 pour la loi agricole, 3 sur 557 pour les fraudes et 37 sur
+562 pour la programmation militaire, seul texte à diviser un bloc. Il n'y a donc pas de
+variation à expliquer à ce niveau, et un logit à effets fixes de bloc n'y converge pas.
+
+### La discipline se relâche sur les amendements
+
+![Taux de dissidence par bloc sur les scrutins d'amendements des trois textes](reports/figures/05_dissidence_par_bloc.png)
+
+Sur les scrutins d'amendements, 4,3 % des votes s'écartent de la position majoritaire du
+groupe, davantage dans les blocs de gouvernement et chez les non-inscrits. C'est cette variation qui
+rend une régression possible. Limite : la dissidence est définie par rapport au groupe
+sur le même scrutin, sans information sur une éventuelle consigne de vote.
+
+### La proximité avec les lobbies ne prédit pas la dissidence
+
+![Odds ratios et intervalles de confiance du modèle de vote dissident](reports/figures/09_coefficients_dissidence.png)
+
+Un écart-type de proximité lexicale en plus est associé à +0,34 point de probabilité de
+dissidence, effet non significatif (p ≈ 0,08) et petit devant celui du bloc politique.
+Le coefficient reste non significatif pour les cinq largeurs de fenêtre temporelle
+testées ([figure 14](reports/figures/14_sensibilite_fenetre.png)). Limite : la proximité
+mesure une convergence de vocabulaire, pas un contact.
+
+### Ce que mesure réellement la proximité lexicale
+
+![Distribution de la proximité lexicale des amendements aux lobbies du texte et à ceux d'un autre texte](reports/figures/10_test_placebo.png)
+
+Pour chaque amendement, on compare la proximité aux demandes des lobbies ayant nommé le
+texte à celle aux lobbies d'un autre texte de l'étude (témoin), sur des corpus de même
+taille : la première est plus élevée sur les trois textes, donc la mesure capte bien du
+sectoriel. Dans le modèle d'adoption, la proximité réelle n'a aucun effet (odds ratio
+1,01, p = 0,89) alors que le témoin est négatif (0,77, p = 0,015) : un amendement hors
+sujet est rejeté. Limite : un cosinus TF-IDF ignore le sens de l'amendement, favorable
+ou contraire à la demande.
+
+### Les intérêts déclarés des députés
+
+![Odds ratios et intervalles de confiance du modèle de dépôt d'amendement](reports/figures/12_coefficients_specialisation.png)
+
+Un député qui déclare un intérêt privé dans le secteur d'un texte a environ trois fois
+plus de chances d'y déposer un amendement (odds ratio 3,0, p = 0,0003), l'appartenance à
+la commission saisie au fond pesant bien davantage. Limite : avec un second repérage de
+l'intérêt sectoriel, l'odds ratio tombe à 1,7 (p = 0,054), et seuls 34 % des libellés
+d'intérêts sont rattachés à un secteur ; le sens de la relation est robuste, son ampleur
+ne l'est pas.
+
+## Reproduire
 
 ### Relire le rapport (le test du correcteur : cloner → installer → Run All)
 
@@ -132,22 +235,6 @@ data/processed/              tables propres en parquet
 reports/figures/             les figures produites
 tests/                       67 tests, centrés sur le matching et la qualité
 ```
-
-## Les textes étudiés
-
-Quatre textes de la XVIIe législature, choisis parce que le lobbying y est documenté et
-les volumes suffisants :
-
-| Clé | Texte | Scrutins | Amendements | Activités HATVP nommant le texte |
-| --- | --- | --- | --- | --- |
-| `agriculture` | Projet de loi d'urgence pour la protection et la souveraineté agricoles | 422 | 1 592 | 29 |
-| `defense` | Projet de loi actualisant la programmation militaire 2024-2030 | 292 | 572 | 14 |
-| `fraudes` | Projet de loi relatif à la lutte contre les fraudes sociales et fiscales | 262 | 747 | 165 |
-| `logement` | Pour la mobilisation de l'habitat existant | 23 | 68 | **0** |
-
-Le texte `logement` est conservé comme **cas témoin** : aucune activité HATVP ne le nomme,
-alors que 419 activités lui sont thématiquement proches. C'est la démonstration la plus
-simple que « proximité de thème » n'est pas « ciblage ».
 
 ## Ce que ce travail ne dit pas
 
