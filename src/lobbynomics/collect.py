@@ -1,6 +1,6 @@
 """Étape 1 — récupération des données brutes.
 
-Quatre sources officielles, toutes en accès libre :
+Quatre bases officielles, toutes en accès libre :
 
 * le répertoire des représentants d'intérêts de la HATVP (qui déclare cibler quoi) ;
 * les amendements de l'Assemblée nationale (qui écrit quoi) ;
@@ -8,7 +8,8 @@ Quatre sources officielles, toutes en accès libre :
 * les déclarations d'intérêts des députés, HATVP également (ce que les députés déclarent).
 
 S'y ajoutent les référentiels qui servent aux jointures et aux contrôles : dossiers
-législatifs et acteurs de l'Assemblée, communes de l'API Géo.
+législatifs et acteurs de l'Assemblée, communes de l'API Géo. Au total, huit fichiers
+(`config.SOURCES`) publiés par trois organismes : HATVP, Assemblée nationale, Etalab.
 
 Le module est idempotent : un fichier déjà téléchargé et non vide n'est pas
 retéléchargé, sauf `force=True`. C'est ce qui permet de relancer le pipeline
@@ -93,11 +94,11 @@ def decompresser(cle: str, *, force: bool = False) -> Path:
 
 
 def tout_recuperer(*, force: bool = False) -> dict[str, dict]:
-    """Télécharge les six sources et écrit un manifeste de provenance.
+    """Télécharge les huit fichiers de `config.SOURCES` et écrit un manifeste de provenance.
 
-    Le manifeste (URL, taille, empreinte, horodatage) est la pièce qui rend la
-    collecte vérifiable : il permet de dire *quelle* version des données a produit
-    les résultats du rapport.
+    Le manifeste (URL, taille, empreinte SHA-256 du premier mégaoctet, horodatage)
+    est la pièce qui rend la collecte vérifiable : il permet de dire *quelle*
+    version des données a produit les résultats du rapport.
     """
     manifeste: dict[str, dict] = {}
     for cle, src in config.SOURCES.items():

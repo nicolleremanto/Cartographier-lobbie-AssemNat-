@@ -1,21 +1,30 @@
 """Étape 5 — modélisation.
 
-Trois régressions logistiques, dans un ordre qui est un argument et pas un
-catalogue :
+Cinq modèles logistiques, dans un ordre qui est un argument et pas un
+catalogue. Quatre sont estimés ; le premier ne peut pas l'être :
 
-1. ``modele_vote_final`` — le vote sur l'ensemble du texte expliqué par le seul
-   bloc politique. Ce modèle est là pour **échouer utilement** : il sépare
-   parfaitement les données. C'est le résultat qui justifie tout le reste.
+1. ``modele_vote_final`` — le vote sur l'ensemble du texte expliqué par le bloc
+   politique (plus la proximité lexicale, l'intérêt déclaré et la part rurale).
+   Ce modèle est là pour **échouer utilement** : le bloc sépare presque
+   parfaitement les données et l'ajustement ne converge pas. C'est le résultat
+   qui justifie tout le reste.
 2. ``modele_dissidence`` — sur les milliers de votes d'amendements, la
    probabilité qu'un député s'écarte de son groupe, expliquée par la proximité
-   lexicale avec les demandes des lobbies, ses intérêts déclarés, la ruralité de
-   sa circonscription et son appartenance de groupe.
+   lexicale avec les demandes des lobbies, ses intérêts déclarés, la part rurale
+   de son département d'élection et son appartenance de bloc.
 3. ``modele_convergence`` — au niveau du député, la probabilité d'écrire des
    amendements lexicalement proches des demandes des lobbies du secteur.
+4. ``modele_adoption`` — au niveau de l'amendement, la probabilité d'être adopté
+   plutôt que rejeté, expliquée par la proximité aux lobbies du texte et par la
+   proximité témoin (lobbies d'un autre texte).
+5. ``modele_specialisation`` — au niveau du député et du texte, la probabilité de
+   déposer au moins un amendement, expliquée par un intérêt déclaré dans le
+   secteur du texte.
 
-Les écarts-types de (2) sont groupés par député : un même député apparaît dans
-des centaines de scrutins, ses erreurs sont corrélées, et des écarts-types
-classiques seraient artificiellement petits.
+Les écarts-types des quatre modèles estimés sont groupés par député : un même
+député apparaît dans des centaines de scrutins (ou signe plusieurs amendements),
+ses erreurs sont corrélées, et des écarts-types classiques seraient
+artificiellement petits.
 """
 from __future__ import annotations
 

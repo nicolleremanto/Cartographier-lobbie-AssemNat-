@@ -38,7 +38,7 @@ ETIQUETTES_VARIABLES = {
     "proximite_max_std": "proximité lexicale avec les lobbies (+1 écart-type)",
     "proximite_top5": "proximité lexicale moyenne (5 plus proches)",
     "interet_sectoriel_declare": "intérêt déclaré dans le secteur du texte",
-    "part_rurale_std": "ruralité de la circonscription (+1 écart-type)",
+    "part_rurale_std": "part rurale du département (+1 écart-type)",
     "dans_commission_competente": "membre de la commission saisie au fond",
     "a_depose_amendement": "a déposé un amendement sur le texte",
     "log_amendements": "nombre d'amendements déposés (log)",
