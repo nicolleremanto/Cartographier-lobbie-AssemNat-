@@ -1,10 +1,14 @@
 """Étape 1 — récupération des données brutes.
 
-Trois sources officielles, toutes en accès libre :
+Quatre sources officielles, toutes en accès libre :
 
 * le répertoire des représentants d'intérêts de la HATVP (qui déclare cibler quoi) ;
-* les déclarations des responsables publics, HATVP également (ce que les députés déclarent) ;
-* l'open data de l'Assemblée nationale (scrutins, amendements, dossiers, acteurs).
+* les amendements de l'Assemblée nationale (qui écrit quoi) ;
+* les scrutins publics de l'Assemblée nationale (qui vote quoi) ;
+* les déclarations d'intérêts des députés, HATVP également (ce que les députés déclarent).
+
+S'y ajoutent les référentiels qui servent aux jointures et aux contrôles : dossiers
+législatifs et acteurs de l'Assemblée, communes de l'API Géo.
 
 Le module est idempotent : un fichier déjà téléchargé et non vide n'est pas
 retéléchargé, sauf `force=True`. C'est ce qui permet de relancer le pipeline
